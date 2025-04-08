@@ -3,27 +3,23 @@ package main
 import (
 	"database/sql"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 type APIServer struct {
-	server *http.Server
-	application *Application
+	server      *http.Server
+	application *application
 }
 
-func NewAPIServer(application *Application) *APIServer {
-	router := mux.NewRouter()
-	//subRouter := router.PathPrefix("/api/v1").Subrouter()
+func NewAPIServer(application *application) *APIServer {
 
 	srv := &http.Server{
 		Addr:     application.addr,
 		ErrorLog: application.errorLog,
-		Handler:  router,
+		Handler:  application.routes(),
 	}
 
 	return &APIServer{
-		server: srv,
+		server:      srv,
 		application: application,
 	}
 }
@@ -31,7 +27,7 @@ func NewAPIServer(application *Application) *APIServer {
 func (srv *APIServer) Run() {
 	srv.application.infoLog.Printf("Starting server on %s", srv.application.addr)
 
-	db,err := openDB(srv.application.dbUrl)
+	db, err := openDB(srv.application.dbUrl)
 
 	if err != nil {
 		srv.application.errorLog.Fatal(err)
@@ -43,16 +39,16 @@ func (srv *APIServer) Run() {
 	srv.application.errorLog.Fatal(err)
 }
 
-func openDB(dsn string) (*sql.DB,error){
-	db,err := sql.Open("postgres",dsn)
+func openDB(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", dsn)
 
-	if err != nil  {
-		return nil,err
+	if err != nil {
+		return nil, err
 	}
 
 	if err = db.Ping(); err != nil {
-		return nil,err
+		return nil, err
 	}
 
-	return db,err
+	return db, err
 }

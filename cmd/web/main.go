@@ -5,19 +5,22 @@ import (
 	"log"
 	"os"
 
+	"github.com/VaudKK/CAS/pkg/imports/excel"
 	_ "github.com/lib/pq"
 )
 
-type Application struct {
+type application struct {
 	dbUrl    string
 	addr     string
 	infoLog  *log.Logger
 	errorLog *log.Logger
+	importModel *excel.ExcelImport
+
 }
 
 func main() {
 
-	application := new(Application)
+	application := new(application)
 
 	flag.StringVar(&application.addr, "addr", ":8080", "Server port")
 	flag.StringVar(&application.dbUrl, "dbUrl", "postgres://postgres:root@localhost:5432/casdb?sslmode=disable", "Database Url postgres://{user}:{password}@{hostname}:{port}/{database-name}")
