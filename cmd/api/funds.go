@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"path/filepath"
 )
 
 func (app *application) upload(w http.ResponseWriter, r *http.Request) {
@@ -18,29 +19,22 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, _, err := r.FormFile("document")
+	file, handler, err := r.FormFile("document")
 
 	if err != nil {
 		app.writeJsonError(w, http.StatusBadRequest, errors.New("missing file or field name 'document'"))
 		return
 	}
 
-	//fileName := handler.Filename
+	fileName := handler.Filename
 
-	//app.infoLog.Printf("Filename :%s File Extension :%s\n", fileName, filepath.Ext(fileName))
-
-	// if filepath.Ext(fileName) != ".xls" || filepath.Ext(fileName) != ".xlsx" {
-	// 	app.writeJsonError(w, http.StatusBadRequest, errors.New("invalid file type, expected excel file"))
-	// 	return
-	// }
-
-	data, err := app.importModel.ProcessExcelFile(file)
-
-	if err != nil {
-		app.writeJsonError(w, http.StatusInternalServerError, err)
+	if filepath.Ext(fileName) != ".xlsx" {
+		app.writeJsonError(w, http.StatusBadRequest, errors.New("invalid file type, expected xlsx excel file"))
 		return
 	}
 
-	app.writeJson(w, http.StatusOK, data)
+	go app.fundsModel.ProcessExcelFile(file)
+
+	app.writeJson(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 
 }

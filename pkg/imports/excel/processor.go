@@ -15,19 +15,21 @@ import (
 type ExcelImport struct {
 }
 
-func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.ImportModel, error) {
+func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.ImportModel,[]string, error) {
 	defer file.Close()
+
+	uniqueCategories := make(map[string]bool,0)
 
 	data, err := io.ReadAll(file)
 
 	if err != nil {
-		return []imports.ImportModel{}, err
+		return []imports.ImportModel{},nil, err
 	}
 
 	f, err := excelize.OpenReader(bytes.NewReader(data))
 
 	if err != nil {
-		return []imports.ImportModel{}, err
+		return []imports.ImportModel{},nil, err
 	}
 
 	defer f.Close()
@@ -46,7 +48,7 @@ func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.Im
 		rows, err := f.GetRows(sheet)
 
 		if err != nil {
-			return []imports.ImportModel{}, err
+			return []imports.ImportModel{},nil,err
 		}
 
 		// read the categories from the first row
@@ -59,6 +61,8 @@ func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.Im
 			categories = append(categories, rows[0][i])
 		}
 
+		exImport.getUniqueCategories(categories,uniqueCategories)
+
 		for i := 1; i < len(rows); i++ {
 			if rows[i][0] == "" {
 				break
@@ -67,26 +71,26 @@ func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.Im
 			total, err := strconv.ParseFloat(exImport.cleanNumericField(rows[i][2]), 32)
 
 			if err != nil {
-				return []imports.ImportModel{}, err
+				return []imports.ImportModel{},nil,err
 			}
 
 			breakdown, err := exImport.readBreakDown(categories, rows[i])
 
 			if err != nil {
-				return []imports.ImportModel{}, err
+				return []imports.ImportModel{},nil,err
 			}
 
 			excelData = append(excelData, imports.ImportModel{
-				Name:      rows[i][0],
+				Name:      exImport.escapeSingleQuote(&rows[i][0]),
 				ReceiptNo: rows[i][1],
 				Total:     total,
-				Date:      t.String(),
+				Date:      t,
 				BreakDown: breakdown})
 		}
 
 	}
 
-	return excelData, nil
+	return excelData,exImport.convertMapToStringArray(uniqueCategories), nil
 }
 
 func (exImport *ExcelImport) cleanDate(date string) string {
@@ -108,7 +112,7 @@ func (exImport *ExcelImport) readBreakDown(categories []string, row []string) (m
 	for i := 0; i < len(categories); i++ {
 		// categories columns start from 3, so we need to add 3 to the index
 		if row[i+3] == "" {
-			break
+			continue
 		}
 
 		value, err := strconv.ParseFloat(exImport.cleanNumericField(row[i+3]), 64)
@@ -121,4 +125,30 @@ func (exImport *ExcelImport) readBreakDown(categories []string, row []string) (m
 	}
 
 	return breakdown, nil
+}
+
+func(exImport *ExcelImport) escapeSingleQuote(s *string) string{
+	if condition := strings.Contains(*s, "'"); condition {
+		*s = strings.ReplaceAll(*s, "'", "''")
+		return *s	
+	}
+	return *s
+}
+
+func (exImport *ExcelImport) getUniqueCategories(categories []string,uniqueCategories map[string]bool){
+	for _, category := range categories {
+		if _, ok := uniqueCategories[category]; !ok {
+			uniqueCategories[category] = true
+		}
+	}
+}
+
+func (exImport *ExcelImport) convertMapToStringArray(uniqueCategories map[string]bool) []string {
+	categories := make([]string, 0)
+
+	for category := range uniqueCategories {
+		categories = append(categories, category)
+	}
+
+	return categories
 }

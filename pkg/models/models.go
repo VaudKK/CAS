@@ -15,12 +15,12 @@ type Member struct {
 	Audit
 }
 
-type Contribution struct {
+type Fund struct {
 	ID             int
-	Category       string
-	Amount         float32
+	BreakDown      map[string]float64
+	Total         float64
 	OrganizationId int
-	Date           time.Time
+	Date           string
 	Contributor    string
 	Audit
 }
