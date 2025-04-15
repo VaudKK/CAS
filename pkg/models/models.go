@@ -3,8 +3,8 @@ package models
 import "time"
 
 type Audit struct {
-	CreatedAt  time.Time
-	ModifiedAt time.Time
+	CreatedAt  time.Time `json:"createdAt"`
+	ModifiedAt time.Time `json:"modifiedAt"`
 }
 
 type Member struct {
@@ -16,12 +16,13 @@ type Member struct {
 }
 
 type Fund struct {
-	ID             int
-	BreakDown      map[string]float64
-	Total         float64
-	OrganizationId int
-	Date           string
-	Contributor    string
+	ID             int                `json:"id"`
+	ReceiptNo      string             `json:"receiptNo"`
+	BreakDown      map[string]float64 `json:"breakDown"`
+	Total          float64            `json:"total"`
+	OrganizationId int                `json:"organizationId"`
+	Date           string             `json:"date"`
+	Contributor    string             `json:"contributor"`
 	Audit
 }
 
