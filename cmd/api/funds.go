@@ -34,6 +34,35 @@ func (app *application) getContributions(w http.ResponseWriter, r *http.Request)
 	app.writeJson(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
 }
 
+func (app *application) search(w http.ResponseWriter, r * http.Request){
+	if r.Method != "GET" {
+		app.writeJsonError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
+		return
+	}
+
+	qs := r.URL.Query()
+
+	page := app.readIntParam(qs, "page", 1)
+	size := app.readIntParam(qs, "size", 10)
+
+	pageable := utils.Pageable{
+		Page:    page,
+		Size:    size,
+		OffSet:  page * size,
+	}
+
+	searchTerm := qs.Get("terms")
+
+	contributions, pageInfo, err := app.fundsModel.FullTextSearch(searchTerm, pageable)
+
+	if err != nil {
+		app.writeJsonError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	app.writeJson(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
+}
+
 func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		app.writeJsonError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))

@@ -7,9 +7,9 @@ type Pageable struct {
 }
 
 type PageInfo struct {
-	CurrentPage  int `json:"currentPage"`
-	Size         int `json:"size"`
-	FirstPage    int `json:"firstPage"`
-	LastPage     int `json:"lastPage"`
-	TotalRecords int `json:"totalRecords"`
+	CurrentPage int `json:"currentPage"`
+	Size        int `json:"size"`
+	FirstPage   int `json:"firstPage"`
+	LastPage    int `json:"lastPage"`
+	TotalItems  int `json:"totalItems"`
 }

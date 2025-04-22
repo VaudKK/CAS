@@ -9,3 +9,5 @@ CREATE TABLE IF NOT EXISTS funds (
     created_at timestamp with time zone default now() not null,
     modified_at timestamp with time zone default now() not null
 );
+
+CREATE INDEX IF NOT EXISTS funds_contributor_idx ON funds USING GIN (to_tsvector('simple', contributor));

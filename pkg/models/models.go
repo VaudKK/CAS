@@ -7,11 +7,15 @@ type Audit struct {
 	ModifiedAt time.Time `json:"modifiedAt"`
 }
 
-type Member struct {
-	ID             int
-	FirstName      string
-	LastName       string
-	OrganizationId int
+type User struct {
+	ID             int       `json:"id"`
+	UserName       string    `json:"userName"`
+	Email          string    `json:"email"`
+	OrganizationId int       `json:"organizationId"`
+	Password       string    `json:"password"`
+	Verified       bool      `json:"verified"`
+	Active         bool      `json:"active"`
+	LastLogin      time.Time `json:"lastLogin"`
 	Audit
 }
 

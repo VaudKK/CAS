@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"mime/multipart"
+	"strings"
 
 	"github.com/VaudKK/CAS/pkg/imports/excel"
 	"github.com/VaudKK/CAS/pkg/models"
@@ -109,36 +110,7 @@ func (m *FundsModel) GetContributions(organizationId int, pageable utils.Pageabl
 
 	defer rows.Close()
 
-	contributions := []*models.Fund{}
-
-	jsonb := make([]byte, 0)
-	totalRecords := 0
-
-	for rows.Next() {
-		row := &models.Fund{}
-		err := rows.Scan(&totalRecords, &row.ID, &row.ReceiptNo, &row.Total, &row.OrganizationId, &row.Date, &row.Contributor,
-			&jsonb, &row.Audit.CreatedAt, &row.Audit.ModifiedAt)
-
-		if err != nil {
-			return nil, utils.PageInfo{}, err
-		}
-
-		err = json.Unmarshal(jsonb, &row.BreakDown)
-
-		if err != nil {
-			utils.GetLoggerInstance().ErrorLog.Println(err)
-		}
-
-		contributions = append(contributions, row)
-	}
-
-	pageInfo := utils.PageInfo{
-		CurrentPage:  pageable.Page,
-		Size:         pageable.Size,
-		TotalRecords: totalRecords,
-		FirstPage:    0,
-		LastPage:     int(math.Floor(float64(totalRecords) / float64(pageable.Size))),
-	}
+	contributions, pageInfo := mapSqlRowsToModel(rows, pageable)
 
 	if err = rows.Err(); err != nil {
 		return nil, utils.PageInfo{}, err
@@ -175,4 +147,83 @@ func (m *FundsModel) SaveCategories(categories []string) (int, error) {
 	}
 
 	return int(rowAffected), nil
+}
+
+func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
+
+	query := `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+						contributor,break_down,created_at,modified_at 
+				FROM funds
+				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+
+	tokens := strings.Split(searchString, " ");
+	searchTerms := ""
+
+	for i, token := range tokens {
+		if token != "" {
+			if i == len(tokens)-1 {
+				searchTerms += token + ":*"
+			} else {
+				searchTerms += token + ":* | "
+			}
+		}
+	}
+
+	query = fmt.Sprintf(query, searchTerms)
+
+	rows, err := m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
+
+	if err != nil {
+		return nil, utils.PageInfo{}, err
+	}
+
+	defer rows.Close()
+
+	contributions, pageInfo := mapSqlRowsToModel(rows, pageable)
+
+	if err = rows.Err(); err != nil {
+		return nil, utils.PageInfo{}, err
+	}
+
+	return contributions, pageInfo, nil
+}
+
+func (m *FundsModel) SearchByDateRange(startDate, endDate string, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
+	return nil,utils.PageInfo{},nil
+}
+
+func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo) {
+	contributions := []*models.Fund{}
+
+	jsonb := make([]byte, 0)
+	totalRecords := 0
+
+	for rows.Next() {
+		row := &models.Fund{}
+		err := rows.Scan(&totalRecords, &row.ID, &row.ReceiptNo, &row.Total, &row.OrganizationId, &row.Date, &row.Contributor,
+			&jsonb, &row.Audit.CreatedAt, &row.Audit.ModifiedAt)
+
+		if err != nil {
+			return nil, utils.PageInfo{}
+		}
+
+		err = json.Unmarshal(jsonb, &row.BreakDown)
+
+		if err != nil {
+			utils.GetLoggerInstance().ErrorLog.Println(err)
+		}
+
+		contributions = append(contributions, row)
+	}
+
+	pageInfo := utils.PageInfo{
+		CurrentPage: pageable.Page,
+		Size:        pageable.Size,
+		TotalItems:  totalRecords,
+		FirstPage:   0,
+		LastPage:    int(math.Floor(float64(totalRecords) / float64(pageable.Size))),
+	}
+
+	return contributions, pageInfo
 }
