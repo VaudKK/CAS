@@ -8,9 +8,9 @@ import (
 	"github.com/VaudKK/CAS/utils"
 )
 
-func (app *application) getContributions(w http.ResponseWriter, r *http.Request){
+func (app *application) getContributions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		app.writeJsonError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
+		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
 		return
 	}
 
@@ -19,24 +19,24 @@ func (app *application) getContributions(w http.ResponseWriter, r *http.Request)
 	size := app.readIntParam(qs, "size", 10)
 
 	pageable := utils.Pageable{
-		Page:    page,
-		Size:    size,
-		OffSet:  page * size,
+		Page:   page,
+		Size:   size,
+		OffSet: page * size,
 	}
 
-	contributions, pageInfo, err := app.fundsModel.GetContributions(1,pageable)
+	contributions, pageInfo, err := app.fundsModel.GetContributions(1, pageable)
 
 	if err != nil {
-		app.writeJsonError(w, http.StatusInternalServerError, err)
+		app.writeJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	app.writeJson(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
+	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
 }
 
-func (app *application) search(w http.ResponseWriter, r * http.Request){
+func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		app.writeJsonError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
+		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
 		return
 	}
 
@@ -46,9 +46,9 @@ func (app *application) search(w http.ResponseWriter, r * http.Request){
 	size := app.readIntParam(qs, "size", 10)
 
 	pageable := utils.Pageable{
-		Page:    page,
-		Size:    size,
-		OffSet:  page * size,
+		Page:   page,
+		Size:   size,
+		OffSet: page * size,
 	}
 
 	searchTerm := qs.Get("terms")
@@ -56,42 +56,42 @@ func (app *application) search(w http.ResponseWriter, r * http.Request){
 	contributions, pageInfo, err := app.fundsModel.FullTextSearch(searchTerm, pageable)
 
 	if err != nil {
-		app.writeJsonError(w, http.StatusInternalServerError, err)
+		app.writeJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	app.writeJson(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
+	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
 }
 
 func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		app.writeJsonError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
+		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
 		return
 	}
 
 	err := r.ParseMultipartForm(10 << 20) // limit upload to 10MB
 
 	if err != nil {
-		app.writeJsonError(w, http.StatusBadRequest, err)
+		app.writeJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
 	file, handler, err := r.FormFile("document")
 
 	if err != nil {
-		app.writeJsonError(w, http.StatusBadRequest, errors.New("missing file or field name 'document'"))
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing file or field name 'document'"))
 		return
 	}
 
 	fileName := handler.Filename
 
 	if filepath.Ext(fileName) != ".xlsx" {
-		app.writeJsonError(w, http.StatusBadRequest, errors.New("invalid file type, expected xlsx excel file"))
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("invalid file type, expected xlsx excel file"))
 		return
 	}
 
 	go app.fundsModel.ProcessExcelFile(file)
 
-	app.writeJson(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
+	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 
 }

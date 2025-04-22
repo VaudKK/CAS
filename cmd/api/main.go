@@ -20,6 +20,7 @@ type config struct {
 type application struct {
 	configuration *config
 	fundsModel    *postgres.FundsModel
+	userModel      *postgres.UserModel
 }
 
 func main() {
@@ -57,6 +58,10 @@ func run(application *application) {
 	defer db.Close()
 
 	application.fundsModel = &postgres.FundsModel{
+		DB: db,
+	}
+
+	application.userModel = &postgres.UserModel{
 		DB: db,
 	}
 

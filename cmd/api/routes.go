@@ -15,8 +15,10 @@ func (app *application) routes() http.Handler {
 	subRouter.HandleFunc("/contributions", app.getContributions).Methods("GET")
 	subRouter.HandleFunc("/contributions/search", app.search).Methods("GET")
 
-	// sign up
+	// user
 	subRouter.HandleFunc("/auth/signup", app.createUser).Methods("POST")
+	subRouter.HandleFunc("/auth/login",app.issueToken).Methods("POST")
 
-	return subRouter
+	//return app.recoverPanic(app.authenticate(subRouter))
+	return app.recoverPanic(subRouter)
 }

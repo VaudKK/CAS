@@ -16,10 +16,10 @@ import (
 type envelope map[string]interface{}
 
 type ErrorResponse struct {
-	ErrorMessage string
+	ErrorMessage interface{} `json:"errorMessage"`
 }
 
-func (app *application) writeJsonError(w http.ResponseWriter, httpStatus int, err error) error {
+func (app *application) writeJSONError(w http.ResponseWriter, httpStatus int, err error) error {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
 
 	utils.GetLoggerInstance().ErrorLog.Output(2, trace)
@@ -42,7 +42,7 @@ func (app *application) writeJsonError(w http.ResponseWriter, httpStatus int, er
 	return nil
 }
 
-func (app *application) writeJson(w http.ResponseWriter, httpStatus int, body any) error {
+func (app *application) writeJSON(w http.ResponseWriter, httpStatus int, body any) error {
 	w.Header().Set("Content-Type", "appication/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(httpStatus)
@@ -56,6 +56,12 @@ func (app *application) writeJson(w http.ResponseWriter, httpStatus int, body an
 	w.Write(js)
 
 	return nil
+}
+
+func (app *application) writeUnauthorizedJSON(w http.ResponseWriter, r *http.Request) {
+	app.writeJSON(w, http.StatusUnauthorized, ErrorResponse{
+		ErrorMessage: "Unauthorized",
+	})
 }
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
@@ -73,15 +79,13 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 		// which includes the location of the problem.
 		case errors.As(err, &syntaxError):
 			return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
-		
-		
+
 		// In some circumstances Decode() may also return an io.ErrUnexpectedEOF error
 		// for syntax errors in the JSON. So we check for this using errors.Is() and
 		// return a generic error message. There is an open issue regarding this at
-		// https://github.com/golang/go/issues/25956.	
-		case errors.Is(err,io.ErrUnexpectedEOF):
+		// https://github.com/golang/go/issues/25956.
+		case errors.Is(err, io.ErrUnexpectedEOF):
 			return fmt.Errorf("body contains badly-formed JSON")
-
 
 		// Likewise, catch any *json.UnmarshalTypeError errors. These occur when the
 		// JSON value is the wrong type for the target destination. If the error relates
@@ -92,7 +96,6 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 				return fmt.Errorf("body contains incorrect JSON type for field %q", unmarshalTypeError.Field)
 			}
 			return fmt.Errorf("body contains incorrect JSON type (at character %d)", unmarshalTypeError.Offset)
-
 
 		// An io.EOF error will be returned by Decode() if the request body is empty. We
 		// check for this with errors.Is() and return a plain-english error message
@@ -105,7 +108,6 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 		// to our handler.
 		case errors.As(err, &invalidUmarshalError):
 			panic(err)
-	
 
 		default:
 			return err
