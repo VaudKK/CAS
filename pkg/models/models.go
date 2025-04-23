@@ -35,3 +35,8 @@ type Organziation struct {
 	Name string
 	Audit
 }
+
+type MonthlyStats struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+}

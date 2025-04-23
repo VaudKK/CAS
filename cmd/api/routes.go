@@ -14,6 +14,7 @@ func (app *application) routes() http.Handler {
 	subRouter.HandleFunc("/contributions/import",app.upload)
 	subRouter.HandleFunc("/contributions", app.getContributions).Methods("GET")
 	subRouter.HandleFunc("/contributions/search", app.search).Methods("GET")
+	subRouter.HandleFunc("/contributions/stats",app.getMonthlyStats).Methods("GET")
 
 	// user
 	subRouter.HandleFunc("/auth/signup", app.createUser).Methods("POST")

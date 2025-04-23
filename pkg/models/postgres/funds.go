@@ -157,7 +157,7 @@ func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable
 				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
 				ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 
-	tokens := strings.Split(searchString, " ");
+	tokens := strings.Split(searchString, " ")
 	searchTerms := ""
 
 	for i, token := range tokens {
@@ -190,7 +190,39 @@ func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable
 }
 
 func (m *FundsModel) SearchByDateRange(startDate, endDate string, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
-	return nil,utils.PageInfo{},nil
+	return nil, utils.PageInfo{}, nil
+}
+
+func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*models.MonthlyStats, error) {
+	stmt := `SELECT key as name, sum(value::jsonb::text::numeric) as value
+				from 
+				funds, jsonb_each(funds.break_down)
+				where extract(year from contribution_date) = $1 and extract(month from contribution_date) = $2 and organization_id = $3
+				group by key`
+
+	rows, err := m.DB.Query(stmt, year, month, 1)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	stats := []*models.MonthlyStats{}
+
+	for rows.Next() {
+		row := &models.MonthlyStats{}
+
+		err := rows.Scan(&row.Name, &row.Value)
+
+		if err != nil {
+			return nil, err
+		}
+
+		stats = append(stats, row)
+	}
+
+	return stats, nil
 }
 
 func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo) {

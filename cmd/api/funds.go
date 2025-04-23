@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/VaudKK/CAS/utils"
 )
@@ -32,6 +33,22 @@ func (app *application) getContributions(w http.ResponseWriter, r *http.Request)
 	}
 
 	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
+}
+
+func (app *application) getMonthlyStats(w http.ResponseWriter,r *http.Request){
+	qs := r.URL.Query()
+
+	year := app.readIntParam(qs, "year", int(time.Now().Year()))
+	month := app.readIntParam(qs, "month", int(time.Now().Month()))
+
+	stats,err := app.fundsModel.GetMonthlyStatistics(year,month,1)
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	app.writeJSON(w,http.StatusOK,stats)
 }
 
 func (app *application) search(w http.ResponseWriter, r *http.Request) {
