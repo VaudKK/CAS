@@ -70,6 +70,13 @@ func (app *application) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = app.mailer.Send(input.Email, "user_welcome.tmpl",nil )
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	app.writeJSON(w, http.StatusCreated, map[string]string{
 		"created": "true",
 	})
