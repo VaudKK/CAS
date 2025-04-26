@@ -30,6 +30,13 @@ type Fund struct {
 	Audit
 }
 
+type UpdateFund struct {
+	Contributor string             `json:"contributor"`
+	Date        time.Time          `json:"date"`
+	Total       float64            `json:"total"`
+	BreakDown   map[string]float64 `json:"breakDown"`
+}
+
 type Organziation struct {
 	ID   int
 	Name string
@@ -40,3 +47,5 @@ type MonthlyStats struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 }
+
+

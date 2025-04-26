@@ -4,10 +4,50 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"time"
 
+	"github.com/VaudKK/CAS/pkg/models"
 	"github.com/VaudKK/CAS/utils"
+	"github.com/gorilla/mux"
 )
+
+func (app *application) addContribution(w http.ResponseWriter, r *http.Request) {
+
+	var input struct {
+		Contributor string             `json:"contributor"`
+		Date        time.Time          `json:"date"`
+		Total       float64            `json:"total"`
+		BreakDown   map[string]float64 `json:"breakDown"`
+		ReceiptNo   string             `json:"receiptNo"`
+	}
+
+	err := app.readJSON(w, r, &input)
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	contributions := []models.Fund{{
+		Contributor:    input.Contributor,
+		Date:           input.Date.Format("2006-01-02"),
+		Total:          input.Total,
+		BreakDown:      input.BreakDown,
+		ReceiptNo:      input.ReceiptNo,
+		OrganizationId: 1,
+	}}
+
+	_, err = app.fundsModel.Insert(contributions)
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	app.writeJSON(w, http.StatusCreated, envelope{"message": "successfully added contribution"})
+
+}
 
 func (app *application) getContributions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -35,20 +75,57 @@ func (app *application) getContributions(w http.ResponseWriter, r *http.Request)
 	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
 }
 
-func (app *application) getMonthlyStats(w http.ResponseWriter,r *http.Request){
+func (app *application) updateContribution(w http.ResponseWriter,r *http.Request){
+	vars := mux.Vars(r)
+	contributionId := vars["id"]
+
+	if contributionId == "" {
+		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing contributor id in path variable"))
+		return
+	}
+
+	input := models.UpdateFund{}
+
+	err := app.readJSON(w, r, &input)
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	id, err := strconv.Atoi(contributionId)
+
+	if err != nil {
+		app.writeJSONError(w,http.StatusBadRequest,err)
+		return
+	}
+
+	_,err = app.fundsModel.UpdateContribution(id,&input)
+
+	if err != nil {
+		app.writeJSONError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+
+	app.writeJSON(w,http.StatusOK,envelope{"message": "updated successfully"})
+
+}
+
+func (app *application) getMonthlyStats(w http.ResponseWriter, r *http.Request) {
 	qs := r.URL.Query()
 
 	year := app.readIntParam(qs, "year", int(time.Now().Year()))
 	month := app.readIntParam(qs, "month", int(time.Now().Month()))
 
-	stats,err := app.fundsModel.GetMonthlyStatistics(year,month,1)
+	stats, err := app.fundsModel.GetMonthlyStatistics(year, month, 1)
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	app.writeJSON(w,http.StatusOK,stats)
+	app.writeJSON(w, http.StatusOK, stats)
 }
 
 func (app *application) search(w http.ResponseWriter, r *http.Request) {

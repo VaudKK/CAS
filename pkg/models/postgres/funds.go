@@ -71,7 +71,7 @@ func (m *FundsModel) Insert(contributions []models.Fund) (int, error) {
 		}
 
 		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s')", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
-			contribution.Contributor, contribution.ReceiptNo)
+			strings.ToUpper(contribution.Contributor), contribution.ReceiptNo)
 
 		if i != len(contributions)-1 {
 			s += ","
@@ -119,25 +119,20 @@ func (m *FundsModel) GetContributions(organizationId int, pageable utils.Pageabl
 	return contributions, pageInfo, nil
 }
 
-func (m *FundsModel) SaveCategories(categories []string) (int, error) {
-	stmt := `INSERT INTO fund_categories(name) VALUES`
+func (m *FundsModel) UpdateContribution(id int,updateFund *models.UpdateFund) (int,error){
+	stmt := `UPDATE funds SET total = $1,contribution_date = $2,contributor = $3,break_down = $4 WHERE
+				id = $5;`
 
-	for i, category := range categories {
-		s := fmt.Sprintf("('%s')", category)
-
-		if i != len(categories)-1 {
-			s += ","
-		}
-
-		stmt += s
-	}
-
-	stmt += ";"
-
-	result, err := m.DB.Exec(stmt)
+	breakDown, err := json.Marshal(updateFund.BreakDown)
 
 	if err != nil {
-		return 0, err
+		return 0,err
+	}
+
+	result, err := m.DB.Exec(stmt,updateFund.Total,updateFund.Date,strings.ToUpper(updateFund.Contributor),string(breakDown),id)
+
+	if err != nil {
+		return 0,err
 	}
 
 	rowAffected, err := result.RowsAffected()
@@ -155,7 +150,7 @@ func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable
 						contributor,break_down,created_at,modified_at 
 				FROM funds
 				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
-				ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+				ORDER BY created_at DESC LIMIT $2 OFFSET $3;`
 
 	tokens := strings.Split(searchString, " ")
 	searchTerms := ""
@@ -198,7 +193,7 @@ func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*m
 				from 
 				funds, jsonb_each(funds.break_down)
 				where extract(year from contribution_date) = $1 and extract(month from contribution_date) = $2 and organization_id = $3
-				group by key`
+				group by key;`
 
 	rows, err := m.DB.Query(stmt, year, month, 1)
 
@@ -223,6 +218,36 @@ func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*m
 	}
 
 	return stats, nil
+}
+
+func (m *FundsModel) SaveCategories(categories []string) (int, error) {
+	stmt := `INSERT INTO fund_categories(name) VALUES`
+
+	for i, category := range categories {
+		s := fmt.Sprintf("('%s')", category)
+
+		if i != len(categories)-1 {
+			s += ","
+		}
+
+		stmt += s
+	}
+
+	stmt += ";"
+
+	result, err := m.DB.Exec(stmt)
+
+	if err != nil {
+		return 0, err
+	}
+
+	rowAffected, err := result.RowsAffected()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return int(rowAffected), nil
 }
 
 func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo) {
