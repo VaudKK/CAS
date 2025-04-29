@@ -16,7 +16,7 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 
 	var input struct {
 		Contributor string             `json:"contributor"`
-		Date        time.Time          `json:"date"`
+		Date        string          `json:"date"`
 		Total       float64            `json:"total"`
 		BreakDown   map[string]float64 `json:"breakDown"`
 		ReceiptNo   string             `json:"receiptNo"`
@@ -29,14 +29,25 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	t,err := time.Parse("2006-01-02",input.Date)
+	if err != nil {
+		app.writeJSONError(w,http.StatusBadRequest,err)
+		return
+	}
+
 	contributions := []models.Fund{{
 		Contributor:    input.Contributor,
-		Date:           input.Date.Format("2006-01-02"),
+		Date:           t.Format("2006-01-02"),
 		Total:          input.Total,
 		BreakDown:      input.BreakDown,
 		ReceiptNo:      input.ReceiptNo,
 		OrganizationId: 1,
 	}}
+
+	if !app.fundsModel.ValidateTotalAndBreakDown(input.Total, input.BreakDown) {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("total and break down items dont tally"))
+		return
+	}
 
 	_, err = app.fundsModel.Insert(contributions)
 
@@ -50,11 +61,6 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 }
 
 func (app *application) getContributions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
-		return
-	}
-
 	qs := r.URL.Query()
 	page := app.readIntParam(qs, "page", 1)
 	size := app.readIntParam(qs, "size", 10)
@@ -75,12 +81,12 @@ func (app *application) getContributions(w http.ResponseWriter, r *http.Request)
 	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
 }
 
-func (app *application) updateContribution(w http.ResponseWriter,r *http.Request){
+func (app *application) updateContribution(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	contributionId := vars["id"]
 
 	if contributionId == "" {
-		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing contributor id in path variable"))
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing contributor id in path variable"))
 		return
 	}
 
@@ -93,22 +99,26 @@ func (app *application) updateContribution(w http.ResponseWriter,r *http.Request
 		return
 	}
 
+	if !app.fundsModel.ValidateTotalAndBreakDown(input.Total, input.BreakDown) {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("total and break down items dont tally"))
+		return
+	}
+
 	id, err := strconv.Atoi(contributionId)
 
 	if err != nil {
-		app.writeJSONError(w,http.StatusBadRequest,err)
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("path parameter must be a positive INTEGER"))
 		return
 	}
 
-	_,err = app.fundsModel.UpdateContribution(id,&input)
+	_, err = app.fundsModel.UpdateContribution(id, &input)
 
 	if err != nil {
-		app.writeJSONError(w,http.StatusInternalServerError,err)
+		app.writeJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-
-	app.writeJSON(w,http.StatusOK,envelope{"message": "updated successfully"})
+	app.writeJSON(w, http.StatusOK, envelope{"message": "updated successfully"})
 
 }
 
@@ -138,6 +148,8 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	page := app.readIntParam(qs, "page", 1)
 	size := app.readIntParam(qs, "size", 10)
+	dateFrom,hasFrom := app.readDateParam(qs, "from")
+	dateTo,hasTo := app.readDateParam(qs, "to")
 
 	pageable := utils.Pageable{
 		Page:   page,
@@ -147,7 +159,19 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	searchTerm := qs.Get("terms")
 
-	contributions, pageInfo, err := app.fundsModel.FullTextSearch(searchTerm, pageable)
+	var contributions []*models.Fund
+	var pageInfo utils.PageInfo
+	var err error
+
+	if searchTerm != "" {
+		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm, pageable)
+	}else if hasFrom && hasTo {
+		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,dateTo,pageable)
+	}else{
+		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing query params, specify search term or both from and to dates"))
+		return
+	}
+	
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -158,11 +182,6 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) upload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
-		return
-	}
-
 	err := r.ParseMultipartForm(10 << 20) // limit upload to 10MB
 
 	if err != nil {
@@ -188,4 +207,15 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 
 	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 
+}
+
+func (app *application) getCategories(w http.ResponseWriter, r *http.Request){
+	data := app.fundsModel.GetCategories()
+
+	if data == nil {
+		app.writeJSON(w,http.StatusOK,make([]string,0))
+		return
+	}
+
+	app.writeJSON(w,http.StatusOK,data)
 }

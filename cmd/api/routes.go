@@ -11,11 +11,12 @@ func (app *application) routes() http.Handler {
 	subRouter := mx.PathPrefix("/api/v1").Subrouter()
 
 	// contributions
-	subRouter.HandleFunc("/contributions/import",app.upload)
+	subRouter.HandleFunc("/contributions/import",app.upload).Methods("POST")
 	subRouter.HandleFunc("/contributions", app.getContributions).Methods("GET")
 	subRouter.HandleFunc("/contributions", app.addContribution).Methods("POST")
 	subRouter.HandleFunc("/contributions/search", app.search).Methods("GET")
 	subRouter.HandleFunc("/contributions/stats",app.getMonthlyStats).Methods("GET")
+	subRouter.HandleFunc("/contributions/categories/all",app.getCategories).Methods("GET")
 	subRouter.HandleFunc("/contributions/{id}",app.updateContribution).Methods("PUT")
 
 	// user

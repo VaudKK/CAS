@@ -7,6 +7,7 @@ import (
 	"math"
 	"mime/multipart"
 	"strings"
+	"time"
 
 	"github.com/VaudKK/CAS/pkg/imports/excel"
 	"github.com/VaudKK/CAS/pkg/models"
@@ -16,6 +17,7 @@ import (
 type FundsModel struct {
 	DB *sql.DB
 }
+
 
 func (m *FundsModel) ProcessExcelFile(file multipart.File) {
 	excelModel := excel.ExcelImport{}
@@ -184,8 +186,28 @@ func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable
 	return contributions, pageInfo, nil
 }
 
-func (m *FundsModel) SearchByDateRange(startDate, endDate string, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
-	return nil, utils.PageInfo{}, nil
+func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
+	query := `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+						contributor,break_down,created_at,modified_at 
+				FROM funds
+				where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
+				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
+
+	rows,err := m.DB.Query(query,1,startDate,endDate,pageable.Size,pageable.OffSet)
+
+	if err != nil {
+		return nil, utils.PageInfo{}, err
+	}
+
+	defer rows.Close()
+
+	contributions, pageInfo := mapSqlRowsToModel(rows, pageable)
+
+	if err = rows.Err(); err != nil {
+		return nil, utils.PageInfo{}, err
+	}
+
+	return contributions, pageInfo, nil
 }
 
 func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*models.MonthlyStats, error) {
@@ -250,6 +272,34 @@ func (m *FundsModel) SaveCategories(categories []string) (int, error) {
 	return int(rowAffected), nil
 }
 
+func (m *FundsModel) GetCategories() []string{
+	stmt := `SELECT DISTINCT(name) FROM public.fund_categories;`
+
+	rows,err := m.DB.Query(stmt)
+
+	if err != nil{
+		utils.GetLoggerInstance().ErrorLog.Println("Error while fetching categories ", err)
+		return nil
+	}
+
+	defer rows.Close()
+
+	categories := make([]string,0)
+
+	for rows.Next(){
+		value := ""
+		err := rows.Scan(&value)
+		if err != nil{
+			utils.GetLoggerInstance().ErrorLog.Println("Error reading categories ", err)
+			return nil
+		}
+
+		categories = append(categories,value)
+	}
+
+	return categories
+}
+
 func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo) {
 	contributions := []*models.Fund{}
 
@@ -283,4 +333,14 @@ func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund,
 	}
 
 	return contributions, pageInfo
+}
+
+func (app *FundsModel)ValidateTotalAndBreakDown(total float64, breakDown map[string]float64)  bool {
+	var sum float64
+
+	for _, value := range breakDown {
+		sum += value
+	}
+
+	return sum == total
 }

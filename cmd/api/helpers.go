@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strconv"
+	"time"
 
 	"github.com/VaudKK/CAS/utils"
 )
@@ -127,8 +128,24 @@ func (app *application) readIntParam(values url.Values, key string, defaultValue
 
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		utils.GetLoggerInstance().InfoLog.Printf("Error converting %s to int", s)
+		utils.GetLoggerInstance().ErrorLog.Printf("Error converting %s to int", s)
 		return defaultValue
 	}
 	return i
+}
+
+func (app *application) readDateParam(values url.Values,key string) (time.Time,bool) {
+	s := values.Get(key)
+	
+	if s == "" {
+		return time.Now(),false
+	}
+
+	t,err := time.Parse("2006-01-02",s)
+	if err != nil {
+		utils.GetLoggerInstance().ErrorLog.Printf("Error converting %s to date",s)
+		return time.Now(),false
+	}
+
+	return t,true
 }
