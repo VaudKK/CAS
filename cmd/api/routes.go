@@ -22,6 +22,8 @@ func (app *application) routes() http.Handler {
 	// user
 	subRouter.HandleFunc("/auth/signup", app.createUser).Methods("POST")
 	subRouter.HandleFunc("/auth/login",app.issueToken).Methods("POST")
+	subRouter.HandleFunc("/auth/otp/send",app.sendOtp).Methods("GET")
+	subRouter.HandleFunc("/auth/otp/verify",app.verifyOtp).Methods("GET")
 
 	//return app.recoverPanic(app.authenticate(subRouter))
 	return app.recoverPanic(subRouter)

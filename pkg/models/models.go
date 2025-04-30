@@ -43,9 +43,17 @@ type Organziation struct {
 	Audit
 }
 
+type Otp struct {
+	ID               int       `json:"id,omitempty"`
+	VerificationMode string    `json:"verificationMode,omitempty"`
+	Otp              string    `json:"otp,omitempty"`
+	Expiry           time.Time `json:"expiry,omitempty"`
+	Used             bool      `json:"used,omitempty"`
+	Subject          string    `json:"subject,omitempty"`
+	SessionId        string    `json:"sessionId,omitempty"`
+}
+
 type MonthlyStats struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 }
-
-

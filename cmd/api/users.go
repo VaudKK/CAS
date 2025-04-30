@@ -82,3 +82,56 @@ func (app *application) createUser(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
+
+func (app *application) sendOtp(w http.ResponseWriter, r *http.Request){
+	email := r.URL.Query().Get("email")
+
+	if email == "" {
+		app.writeJSONError(w,http.StatusBadRequest,errors.New("email parameter missing"))
+		return
+	}
+
+	v := validator.New()
+
+	data.ValidateEmail(v,email)
+
+	if !v.Valid() {
+		app.writeJSON(w, http.StatusBadRequest, v.Errors)
+		return
+	}
+
+	response,err := app.otpModel.SendOtp(email,"email")
+
+	if err != nil {
+		app.writeJSONError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	app.writeJSON(w,http.StatusOK,response)
+}
+
+
+
+func (app *application) verifyOtp(w http.ResponseWriter, r *http.Request){
+	sessionId := r.URL.Query().Get("session")
+	otp := r.URL.Query().Get("otp")
+
+	if otp == "" || sessionId == "" {
+		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing sessionId and/or otp parameter"))
+		return
+	}
+
+	response, err := app.otpModel.VerifyOtp(otp,sessionId)
+	
+	if err != nil {
+		app.writeJSONError(w,http.StatusInternalServerError,err)
+		return
+	}
+
+	if !response {
+		app.writeJSON(w,http.StatusOK,envelope{"message": "invalid otp"})
+		return
+	}else{
+		app.writeJSON(w,http.StatusOK,envelope{"message": "success"})
+	}
+}
