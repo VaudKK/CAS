@@ -11,13 +11,12 @@ func (app *application) routes() http.Handler {
 	subRouter := mx.PathPrefix("/api/v1").Subrouter()
 
 	// contributions
-	subRouter.HandleFunc("/contributions/import",app.upload).Methods("POST")
-	subRouter.HandleFunc("/contributions", app.getContributions).Methods("GET")
-	subRouter.HandleFunc("/contributions", app.addContribution).Methods("POST")
-	subRouter.HandleFunc("/contributions/search", app.search).Methods("GET")
-	subRouter.HandleFunc("/contributions/stats",app.getMonthlyStats).Methods("GET")
-	subRouter.HandleFunc("/contributions/categories/all",app.getCategories).Methods("GET")
-	subRouter.HandleFunc("/contributions/{id}",app.updateContribution).Methods("PUT")
+	subRouter.Handle("/contributions/import",app.requiredAuthenticatedUser(app.upload)).Methods("POST")
+	subRouter.Handle("/contributions", app.requiredAuthenticatedUser(app.addContribution)).Methods("POST")
+	subRouter.Handle("/contributions/search", app.requiredAuthenticatedUser(app.search)).Methods("GET")
+	subRouter.Handle("/contributions/stats",app.requiredAuthenticatedUser(app.getMonthlyStats)).Methods("GET")
+	subRouter.Handle("/contributions/categories/all",app.requiredAuthenticatedUser(app.getCategories)).Methods("GET")
+	subRouter.Handle("/contributions/{id}", app.requiredAuthenticatedUser(app.updateContribution)).Methods("PUT")
 
 	// user
 	subRouter.HandleFunc("/auth/signup", app.createUser).Methods("POST")
@@ -25,6 +24,5 @@ func (app *application) routes() http.Handler {
 	subRouter.HandleFunc("/auth/otp/send",app.sendOtp).Methods("GET")
 	subRouter.HandleFunc("/auth/otp/verify",app.verifyOtp).Methods("GET")
 
-	//return app.recoverPanic(app.authenticate(subRouter))
-	return app.recoverPanic(subRouter)
+	return app.recoverPanic(app.authenticate(subRouter))
 }

@@ -64,3 +64,9 @@ func VerifyToken(tokenString string) (int,error) {
 		return -1, fmt.Errorf("invalid token")
 	}
 }
+
+
+// Check if a User instance is the AnonymousUser.
+func IsAnonymous(u *models.User) bool {
+	return u == AnonymousUser
+}

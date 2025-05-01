@@ -31,6 +31,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		if authorizationHeader == "" {
 			r = app.contextSetUser(r,data.AnonymousUser)
 			next.ServeHTTP(w,r)
+			return
 		}
 
 		headerParts := strings.Split(authorizationHeader," ")
@@ -67,5 +68,27 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w,r)
 
+	})
+}
+
+func (app *application) requiredAuthenticatedUser(next http.HandlerFunc) http.Handler{
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Use the contextGetUser() helper to retrieve the user
+		// information from the request context.
+		user := app.contextGetUser(r)
+		// If the user is anonymous, then call the authenticationRequiredResponse() to
+		// inform the client that they should authenticate before trying again.
+		if data.IsAnonymous(user) {
+			app.writeJSON(w, http.StatusUnauthorized,envelope{"errorMessage":"unauthorized"})
+			return
+		}
+		// If the user is not activated,
+		// inform them that they need to verify their account.
+		if !user.Verified {
+			app.writeJSON(w, http.StatusForbidden,envelope{"errorMessage":"unverified user"})
+			return
+		}
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
 	})
 }
