@@ -15,6 +15,7 @@ import (
 type OtpModel struct {
 	DB     *sql.DB
 	Mailer *mailer.Mailer
+	User   *UserModel
 }
 
 func (m *OtpModel) SendOtp(subject, mode string) (*models.Otp, error) {
@@ -43,10 +44,10 @@ func (m *OtpModel) SendOtp(subject, mode string) (*models.Otp, error) {
 	emailData.Otp = otp
 
 	//send mail
-	err = m.Mailer.Send(subject,"user_otp.tmpl",emailData)
+	err = m.Mailer.Send(subject, "user_otp.tmpl", emailData)
 
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	return &models.Otp{
@@ -57,7 +58,7 @@ func (m *OtpModel) SendOtp(subject, mode string) (*models.Otp, error) {
 }
 
 func (m *OtpModel) VerifyOtp(otp, sessionId string) (bool, error) {
-	stmt := `SELECT otp,session_id,expiry FROM otp WHERE session_id = $1 AND used = false;`
+	stmt := `SELECT otp,session_id,expiry,subject FROM otp WHERE session_id = $1 AND used = false;`
 
 	rows, err := m.DB.Query(stmt, sessionId)
 
@@ -71,10 +72,11 @@ func (m *OtpModel) VerifyOtp(otp, sessionId string) (bool, error) {
 		sessionId string
 		expiry    time.Time
 		otp       string
+		subject   string
 	}
 
 	for rows.Next() {
-		err = rows.Scan(&data.otp, &data.sessionId, &data.expiry)
+		err = rows.Scan(&data.otp, &data.sessionId, &data.expiry, &data.subject)
 
 		if err != nil {
 			return false, err
@@ -89,9 +91,15 @@ func (m *OtpModel) VerifyOtp(otp, sessionId string) (bool, error) {
 		return false, nil
 	}
 
-	updateStmt := `UPDATE otp SET used = $1 WHERE session_id = $2`;
+	updateStmt := `UPDATE otp SET used = $1 WHERE session_id = $2`
 
-	_,err = m.DB.Exec(updateStmt,true,sessionId)
+	_, err = m.DB.Exec(updateStmt, true, sessionId)
+
+	if err != nil {
+		return false, err
+	}
+
+	err = m.User.VerifyUser(data.subject)
 
 	if err != nil {
 		return false, err

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	exporter "github.com/VaudKK/CAS/pkg/exports/excel"
+	pdf_exporter "github.com/VaudKK/CAS/pkg/exports/pdf"
 	"github.com/VaudKK/CAS/pkg/imports/excel"
 	"github.com/VaudKK/CAS/pkg/models"
 	"github.com/VaudKK/CAS/utils"
@@ -16,6 +18,8 @@ import (
 
 type FundsModel struct {
 	DB *sql.DB
+	ExcelExporter *exporter.ExcelExport
+	PdfExporter *pdf_exporter.PdfExport
 }
 
 
@@ -343,4 +347,29 @@ func (app *FundsModel)ValidateTotalAndBreakDown(total float64, breakDown map[str
 	}
 
 	return sum == total
+}
+
+func (m *FundsModel) GenerateExcelFile(contributions []*models.Fund) ([]byte, error) {
+
+	categories := m.GetCategories()
+
+	excelFile, err := m.ExcelExporter.GenerateExcelFile(contributions,categories)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return excelFile,nil
+}
+
+func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund) ([]byte, error) {
+	categories := m.GetCategories()
+
+	pdfFile, err := m.PdfExporter.GeneratePdfFile(contributions,categories)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pdfFile,nil
 }

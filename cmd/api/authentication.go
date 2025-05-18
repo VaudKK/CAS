@@ -45,7 +45,7 @@ func (app *application) issueToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	valid, err := app.userModel.VerifyUser(input.Email, input.Password)
+	valid, err := app.userModel.ValidateUser(input.Email, input.Password)
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -57,13 +57,12 @@ func (app *application) issueToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-	token,err := data.CreateToken(usr.ID)
+	token, err := data.CreateToken(usr.ID)
 
 	if err != nil {
-		app.writeUnauthorizedJSON(w,r)
+		app.writeUnauthorizedJSON(w, r)
 		return
 	}
 
-	app.writeJSON(w,http.StatusOK,token)
+	app.writeJSON(w, http.StatusOK, token)
 }

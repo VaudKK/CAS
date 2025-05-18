@@ -13,6 +13,7 @@ func (app *application) routes() http.Handler {
 	// contributions
 	subRouter.Handle("/contributions/import", app.requiresAuthenticatedUser(app.upload)).Methods("POST")
 	subRouter.Handle("/contributions", app.requiresAuthenticatedUser(app.addContribution)).Methods("POST")
+	subRouter.Handle("/contributions", app.requiresAuthenticatedUser(app.getContributions)).Methods("GET")
 	subRouter.Handle("/contributions/search", app.requiresAuthenticatedUser(app.search)).Methods("GET")
 	subRouter.Handle("/contributions/stats", app.requiresAuthenticatedUser(app.getMonthlyStats)).Methods("GET")
 	subRouter.Handle("/contributions/categories/all", app.requiresAuthenticatedUser(app.getCategories)).Methods("GET")

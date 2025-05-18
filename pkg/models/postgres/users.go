@@ -22,7 +22,7 @@ func (m *UserModel) CreateUser(user *models.User) (int, error) {
 		return 0, err
 	}
 
-	result, err := m.DB.Exec(stmt, user.UserName, user.Email, user.OrganizationId, hashPassword, true,false)
+	result, err := m.DB.Exec(stmt, user.UserName, user.Email, user.OrganizationId, hashPassword, true, false)
 
 	if err != nil {
 		return 0, err
@@ -37,7 +37,7 @@ func (m *UserModel) CreateUser(user *models.User) (int, error) {
 	return int(rowAffected), nil
 }
 
-func (m *UserModel) VerifyUser(username, password string) (bool, error) {
+func (m *UserModel) ValidateUser(username, password string) (bool, error) {
 	stmt := `SELECT email,password FROM users WHERE email = $1 AND active = true`
 
 	row, err := m.DB.Query(stmt, username)
@@ -62,6 +62,18 @@ func (m *UserModel) VerifyUser(username, password string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (m *UserModel) VerifyUser(email string) error {
+	stmt := `UPDATE users SET verified = true WHERE email = $1;`
+
+	_, err := m.DB.Exec(stmt, email)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *UserModel) GetUserByEmail(email string) (*models.User, error) {
@@ -102,7 +114,7 @@ func (m *UserModel) GetUserID(id int) (*models.User, error) {
 	var user models.User
 
 	if row.Next() {
-		err = row.Scan(&user.ID, &user.UserName,&user.Email, &user.Verified, &user.Active)
+		err = row.Scan(&user.ID, &user.UserName, &user.Email, &user.Verified, &user.Active)
 		if err != nil {
 			return nil, err
 		}

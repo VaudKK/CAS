@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -150,11 +151,19 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	size := app.readIntParam(qs, "size", 10)
 	dateFrom,hasFrom := app.readDateParam(qs, "from")
 	dateTo,hasTo := app.readDateParam(qs, "to")
+	generateExcel := qs.Get("generateExcel")
+	generatePdf := qs.Get("generatePdf")
 
 	pageable := utils.Pageable{
 		Page:   page,
 		Size:   size,
 		OffSet: page * size,
+	}
+
+	if generateExcel == "true" || generatePdf == "true" {
+		pageable.Size = math.MaxInt
+		pageable.Page = 0
+		pageable.OffSet = 0
 	}
 
 	searchTerm := qs.Get("terms")
@@ -175,6 +184,33 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if generatePdf == "true" {
+		file, err := app.fundsModel.GeneratePdfFile(contributions)
+		if err != nil {
+			app.writeJSONError(w,http.StatusInternalServerError,err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", "attachment; filename=contributions.pdf")
+		w.Write(file)
+		return
+	}
+
+
+	if generateExcel == "true" {
+		file, err := app.fundsModel.GenerateExcelFile(contributions)
+		if err != nil {
+			app.writeJSONError(w,http.StatusInternalServerError,err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", "attachment; filename=contributions.xlsx")
+		w.Write(file)
 		return
 	}
 
