@@ -49,8 +49,8 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 		return nil, err
 	}
 
-	f.SetCellStyle("Contributions", "A1", "AZ1", headerStyle)
-	f.SetColWidth("Contributions", "A", "AZ", 17)
+
+	f.SetColWidth("Contributions", "A", "AZ", 21)
 
 	categoryIndex := make(map[string]int)
 
@@ -65,7 +65,8 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 
 	for i, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		f.SetColWidth("Contributions", cell, cell, 20)
+		f.SetCellStyle("Contributions", cell, cell, headerStyle)
+		f.SetColWidth("Contributions", cell, cell, 17)
 		f.SetCellValue("Contributions", cell, header)
 	}
 
@@ -86,11 +87,17 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 		f.SetCellStyle("Contributions", cellReceiptNo, cellReceiptNo, boarderStyle)
 		f.SetCellStyle("Contributions", cellDate, cellDate, boarderStyle)
 
+		// set border on all columns
+		for k := 3; k < len(headers); k++ {
+			cellCategory, _ := excelize.CoordinatesToCellName(k + 1, i+2)
+			f.SetCellStyle("Contributions", cellCategory, cellCategory, boarderStyle)
+		}
+
 		for category, amount := range contribution.BreakDown {
 			if j, ok := categoryIndex[category]; ok {
 				cellCategory, _ := excelize.CoordinatesToCellName(j + 1, i+2)
 				f.SetCellValue("Contributions", cellCategory, amount)
-				f.SetCellStyle("Contributions", cellCategory, cellCategory, boarderStyle)
+				//f.SetCellStyle("Contributions", cellCategory, cellCategory, boarderStyle)
 			}
 		}
 	}
