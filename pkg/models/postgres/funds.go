@@ -150,13 +150,25 @@ func (m *FundsModel) UpdateContribution(id int,updateFund *models.UpdateFund) (i
 	return int(rowAffected), nil
 }
 
-func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
+func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.Time,pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
 
-	query := `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+	var query string
+
+	if !startDate.IsZero()  && !endDate.IsZero() {
+		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
 				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
 				ORDER BY created_at DESC LIMIT $2 OFFSET $3;`
+	}else{
+		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+						contributor,break_down,created_at,modified_at 
+				FROM funds
+				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				AND contribution_date BETWEEN $2 AND $3
+				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
+	}
+	
 
 	tokens := strings.Split(searchString, " ")
 	searchTerms := ""
@@ -173,7 +185,15 @@ func (m *FundsModel) FullTextSearch(searchString string, pageable utils.Pageable
 
 	query = fmt.Sprintf(query, searchTerms)
 
-	rows, err := m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
+	var rows *sql.Rows
+	var err error
+
+	if !startDate.IsZero() && !endDate.IsZero() {
+		rows, err = m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
+	}else{
+		rows, err = m.DB.Query(query, 1,startDate,endDate, pageable.Size, pageable.OffSet)
+	}
+	
 
 	if err != nil {
 		return nil, utils.PageInfo{}, err
@@ -244,6 +264,88 @@ func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*m
 	}
 
 	return stats, nil
+}
+
+func (m *FundsModel) GetMonthlyVariance(targetCategories []string)([]*models.Variance,error){
+	stmt := `WITH previous AS (SELECT key as prev_category,sum(value::jsonb::text::numeric) as prev_total
+				FROM funds, jsonb_each(funds.break_down) 
+				WHERE extract(month from contribution_date) =
+				extract(month from date_trunc('month', now() - interval '1' month))
+				group by prev_category),
+				current_val AS (SELECT key as category,sum(value::jsonb::text::numeric) as total
+				FROM funds, jsonb_each(funds.break_down) 
+				WHERE extract(month from funds.contribution_date) = extract(month from now())
+				group by category)
+
+				SELECT current_val.category,current_val.total,coalesce(previous.prev_total,0) prev_total,
+				(current_val.total - coalesce(previous.prev_total,0)) as difference FROM
+				current_val LEFT JOIN previous ON current_val.category = previous.prev_category;`
+
+	rows, err := m.DB.Query(stmt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	stats := []*models.StatisticalVariance{}
+
+	for rows.Next() {
+		row := &models.StatisticalVariance{}
+
+		err := rows.Scan(&row.Category,&row.Total,&row.PreviousTotal,&row.Difference)
+
+		if err != nil {
+			return nil, err
+		}
+
+		stats = append(stats, row)
+	}
+
+	statistics := []*models.Variance{}
+
+	for _,category := range targetCategories {
+		variance := getTargetCategory(category,stats)
+
+		if(variance != nil){
+
+			var percentage float64
+
+			if(variance.PreviousTotal == 0){
+				percentage = 100.0
+			}else{
+				percentage = ((variance.Total - variance.PreviousTotal) / math.Abs(variance.PreviousTotal)) * 100.0
+			}
+			
+			direction := 0
+
+			if percentage > 0 {
+				direction = 1
+			}else if percentage < 0 {
+				direction = -1
+			}
+
+			vars := models.Variance{
+				Category: variance.Category,
+				CurrentValue: variance.Total,
+				Percentage: float32(percentage),
+				Direction: int8(direction),
+			}
+
+			statistics = append(statistics, &vars)
+		}else{
+			vars := models.Variance{
+				Category: category,
+				CurrentValue: 0,
+				Percentage: 0.00,
+				Direction: 0,
+			}
+			statistics = append(statistics, &vars)
+		}
+	}
+
+	return statistics,nil
 }
 
 func (m *FundsModel) SaveCategories(categories []string) (int, error) {
@@ -337,6 +439,16 @@ func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund,
 	}
 
 	return contributions, pageInfo
+}
+
+func getTargetCategory(target string,data []*models.StatisticalVariance) *models.StatisticalVariance{
+	for _, stat := range data {
+		if strings.EqualFold(target, stat.Category) {
+			return stat
+		}
+	}
+
+	return nil
 }
 
 func (app *FundsModel)ValidateTotalAndBreakDown(total float64, breakDown map[string]float64)  bool {

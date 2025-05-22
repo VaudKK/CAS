@@ -139,6 +139,18 @@ func (app *application) getMonthlyStats(w http.ResponseWriter, r *http.Request) 
 	app.writeJSON(w, http.StatusOK, stats)
 }
 
+func (app *application) getStatisticalVariance(w http.ResponseWriter, _ *http.Request) {
+
+	stats, err := app.fundsModel.GetMonthlyVariance([]string{"LCB","COMB. OFFERING","BUILDING CHURCH FUNDS"})
+
+	if err != nil {
+		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, stats)
+}
+
 func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		app.writeJSONError(w, http.StatusMethodNotAllowed, errors.New(http.StatusText(http.StatusMethodNotAllowed)))
@@ -173,7 +185,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if searchTerm != "" {
-		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm, pageable)
+		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm,dateFrom,dateTo, pageable)
 	}else if hasFrom && hasTo {
 		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,dateTo,pageable)
 	}else{

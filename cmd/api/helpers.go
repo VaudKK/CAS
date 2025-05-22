@@ -138,7 +138,7 @@ func (app *application) readDateParam(values url.Values,key string) (time.Time,b
 	s := values.Get(key)
 	
 	if s == "" {
-		return time.Now(),false
+		return time.Time{},false
 	}
 
 	t,err := time.Parse("2006-01-02",s)

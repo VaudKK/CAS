@@ -57,3 +57,17 @@ type MonthlyStats struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 }
+
+type StatisticalVariance struct {
+	Category      string
+	Total         float64
+	PreviousTotal float64
+	Difference    float64
+}
+
+type Variance struct {
+	Category     string  `json:"category"`
+	CurrentValue float64 `json:"currentValue"`
+	Percentage   float32 `json:"percentage"`
+	Direction    int8    `json:"direction"`
+}
