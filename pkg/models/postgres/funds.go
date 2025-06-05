@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"mime/multipart"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/VaudKK/CAS/pkg/imports/excel"
 	"github.com/VaudKK/CAS/pkg/models"
 	"github.com/VaudKK/CAS/utils"
+	"slices"
 )
 
 type FundsModel struct {
@@ -23,7 +25,7 @@ type FundsModel struct {
 }
 
 
-func (m *FundsModel) ProcessExcelFile(file multipart.File) {
+func (m *FundsModel) ProcessExcelFile(currentUser *models.User,file multipart.File) {
 	excelModel := excel.ExcelImport{}
 	data, categories, err := excelModel.ProcessExcelFile(file)
 
@@ -55,7 +57,7 @@ func (m *FundsModel) ProcessExcelFile(file multipart.File) {
 
 	utils.GetLoggerInstance().InfoLog.Printf("Inserted %d categories", insertedCategories)
 
-	inserted, err := m.Insert(funds)
+	inserted, err := m.Insert(currentUser,funds)
 
 	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println(err)
@@ -65,8 +67,8 @@ func (m *FundsModel) ProcessExcelFile(file multipart.File) {
 	utils.GetLoggerInstance().InfoLog.Printf("Inserted %d funds", inserted)
 }
 
-func (m *FundsModel) Insert(contributions []models.Fund) (int, error) {
-	stmt := `INSERT INTO funds(break_down,total,organization_id,contribution_date,contributor,receipt_no) VALUES`
+func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fund) (int, error) {
+	stmt := `INSERT INTO funds(break_down,total,organization_id,contribution_date,contributor,receipt_no,created_by) VALUES`
 
 	for i, contribution := range contributions {
 		breakDown, err := json.Marshal(contribution.BreakDown)
@@ -76,8 +78,8 @@ func (m *FundsModel) Insert(contributions []models.Fund) (int, error) {
 			continue
 		}
 
-		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s')", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
-			strings.ToUpper(contribution.Contributor), contribution.ReceiptNo)
+		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s',%s)", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
+			strings.ToUpper(contribution.Contributor), contribution.ReceiptNo,strconv.Itoa(currentUser.ID))
 
 		if i != len(contributions)-1 {
 			s += ","
@@ -154,7 +156,7 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 
 	var query string
 
-	if !startDate.IsZero()  && !endDate.IsZero() {
+	if startDate.IsZero()  && endDate.IsZero() {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
@@ -188,7 +190,7 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 	var rows *sql.Rows
 	var err error
 
-	if !startDate.IsZero() && !endDate.IsZero() {
+	if startDate.IsZero() && endDate.IsZero() {
 		rows, err = m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
 	}else{
 		rows, err = m.DB.Query(query, 1,startDate,endDate, pageable.Size, pageable.OffSet)
@@ -211,13 +213,31 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 }
 
 func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
-	query := `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+	query := ""
+
+	if endDate.IsZero() {
+		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+						contributor,break_down,created_at,modified_at 
+				FROM funds
+				where organization_id = $1 AND contribution_date = $2
+				ORDER BY created_at DESC LIMIT $3 OFFSET $4;`
+	}else{
+		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
 				where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
 				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
+	}
+	
+	var rows *sql.Rows
+	var err error
 
-	rows,err := m.DB.Query(query,1,startDate,endDate,pageable.Size,pageable.OffSet)
+	if endDate.IsZero() {
+		rows,err = m.DB.Query(query,1,startDate,pageable.Size,pageable.OffSet)
+	}else{
+		rows,err = m.DB.Query(query,1,startDate,endDate,pageable.Size,pageable.OffSet)
+	}
+	
 
 	if err != nil {
 		return nil, utils.PageInfo{}, err
@@ -349,6 +369,13 @@ func (m *FundsModel) GetMonthlyVariance(targetCategories []string)([]*models.Var
 }
 
 func (m *FundsModel) SaveCategories(categories []string) (int, error) {
+
+	distinctCategories := makeCategoriesUnique(&categories,m.GetCategories())
+
+	if len(distinctCategories) == 0 {
+		return 0,nil
+	}
+
 	stmt := `INSERT INTO fund_categories(name) VALUES`
 
 	for i, category := range categories {
@@ -404,6 +431,18 @@ func (m *FundsModel) GetCategories() []string{
 	}
 
 	return categories
+}
+
+func makeCategoriesUnique(newCategories *[]string,existingCategories []string) []string{
+	categoriesToSave := make([]string,0)
+
+	for _, category := range *newCategories{
+		if !slices.Contains(existingCategories,category) {
+			categoriesToSave = append(categoriesToSave, category)
+		}
+	}
+
+	return categoriesToSave
 }
 
 func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo) {

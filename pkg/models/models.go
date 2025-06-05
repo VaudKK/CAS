@@ -5,6 +5,8 @@ import "time"
 type Audit struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	ModifiedAt time.Time `json:"modifiedAt"`
+	CreatedBy  string    `json:"createdBy"`
+	ModifiedBy string    `json:"modifiedBy"`
 }
 
 type User struct {

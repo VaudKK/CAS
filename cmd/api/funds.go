@@ -50,7 +50,7 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = app.fundsModel.Insert(contributions)
+	_, err = app.fundsModel.Insert(app.contextGetUser(r),contributions)
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -188,6 +188,8 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm,dateFrom,dateTo, pageable)
 	}else if hasFrom && hasTo {
 		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,dateTo,pageable)
+	}else if hasFrom && !hasTo {
+		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,time.Time{},pageable)
 	}else{
 		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing query params, specify search term or both from and to dates"))
 		return
@@ -251,7 +253,7 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go app.fundsModel.ProcessExcelFile(file)
+	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r),file)
 
 	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 
