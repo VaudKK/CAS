@@ -79,7 +79,7 @@ func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fun
 		}
 
 		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s',%s)", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
-			strings.ToUpper(contribution.Contributor), contribution.ReceiptNo,strconv.Itoa(currentUser.ID))
+			strings.ToUpper(contribution.Contributor), "KCS-" + strconv.Itoa(int(time.Now().UnixMilli())),strconv.Itoa(currentUser.ID))
 
 		if i != len(contributions)-1 {
 			s += ","
@@ -252,6 +252,65 @@ func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable ut
 	}
 
 	return contributions, pageInfo, nil
+}
+
+func (m *FundsModel) GetSummary(startDate, endDate time.Time,organizationId int) ([]byte,error){
+	stmt := `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
+			from funds, jsonb_each(funds.break_down)
+			where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
+			group by contribution_date,key
+			order by contribution_date;`
+
+	rows, err := m.DB.Query(stmt, 1, startDate, endDate)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	summary := make(map[string][]models.MonthlySummations, 0)
+	data := []*models.MonthlySummations{}
+
+	for rows.Next() {
+		row := &models.MonthlySummations{}
+
+		err := rows.Scan(&row.Category, &row.Total,&row.Date)
+
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, row)
+	}
+
+	for _, row := range data {
+		if value, ok := summary[row.Date]; ok {
+			value = append(value,models.MonthlySummations{
+				Category: row.Category,
+				Date: row.Date,
+				Total: row.Total,
+			})
+			summary[row.Date] = value
+		}else{
+			list := []models.MonthlySummations{}
+			list = append(list, models.MonthlySummations{
+				Category: row.Category,
+				Date: row.Date,
+				Total: row.Total,
+			})
+
+			summary[row.Date] = list
+		}
+	}
+
+	file,err := m.GenerateExcelSummaryFile(summary)
+
+	if err != nil {
+		return nil,err
+	}
+
+	return file, nil
 }
 
 func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*models.MonthlyStats, error) {
@@ -523,4 +582,18 @@ func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund) ([]byte, erro
 	}
 
 	return pdfFile,nil
+}
+
+func (m *FundsModel) GenerateExcelSummaryFile(data map[string][]models.MonthlySummations) ([]byte,error){
+	categories := m.GetCategories()
+
+	excelFile,err := m.ExcelExporter.GenerateExcelSummary(
+		data,
+	categories)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return excelFile,nil
 }

@@ -17,10 +17,9 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 
 	var input struct {
 		Contributor string             `json:"contributor"`
-		Date        string          `json:"date"`
+		Date        string             `json:"date"`
 		Total       float64            `json:"total"`
 		BreakDown   map[string]float64 `json:"breakDown"`
-		ReceiptNo   string             `json:"receiptNo"`
 	}
 
 	err := app.readJSON(w, r, &input)
@@ -30,9 +29,9 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	t,err := time.Parse("2006-01-02",input.Date)
+	t, err := time.Parse("2006-01-02", input.Date)
 	if err != nil {
-		app.writeJSONError(w,http.StatusBadRequest,err)
+		app.writeJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -41,7 +40,6 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		Date:           t.Format("2006-01-02"),
 		Total:          input.Total,
 		BreakDown:      input.BreakDown,
-		ReceiptNo:      input.ReceiptNo,
 		OrganizationId: 1,
 	}}
 
@@ -50,7 +48,7 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = app.fundsModel.Insert(app.contextGetUser(r),contributions)
+	_, err = app.fundsModel.Insert(app.contextGetUser(r), contributions)
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -141,7 +139,7 @@ func (app *application) getMonthlyStats(w http.ResponseWriter, r *http.Request) 
 
 func (app *application) getStatisticalVariance(w http.ResponseWriter, _ *http.Request) {
 
-	stats, err := app.fundsModel.GetMonthlyVariance([]string{"LCB","COMB. OFFERING","BUILDING CHURCH FUNDS"})
+	stats, err := app.fundsModel.GetMonthlyVariance([]string{"LCB", "COMB. OFFERING", "BUILDING CHURCH FUNDS"})
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -161,8 +159,8 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	page := app.readIntParam(qs, "page", 1)
 	size := app.readIntParam(qs, "size", 10)
-	dateFrom,hasFrom := app.readDateParam(qs, "from")
-	dateTo,hasTo := app.readDateParam(qs, "to")
+	dateFrom, hasFrom := app.readDateParam(qs, "from")
+	dateTo, hasTo := app.readDateParam(qs, "to")
 	generateExcel := qs.Get("generateExcel")
 	generatePdf := qs.Get("generatePdf")
 
@@ -185,16 +183,15 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if searchTerm != "" {
-		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm,dateFrom,dateTo, pageable)
-	}else if hasFrom && hasTo {
-		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,dateTo,pageable)
-	}else if hasFrom && !hasTo {
-		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom,time.Time{},pageable)
-	}else{
-		app.writeJSONError(w,http.StatusBadRequest,errors.New("missing query params, specify search term or both from and to dates"))
+		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm, dateFrom, dateTo, pageable)
+	} else if hasFrom && hasTo {
+		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom, dateTo, pageable)
+	} else if hasFrom && !hasTo {
+		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom, time.Time{}, pageable)
+	} else {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing query params, specify search term or both from and to dates"))
 		return
 	}
-	
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
@@ -204,7 +201,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	if generatePdf == "true" {
 		file, err := app.fundsModel.GeneratePdfFile(contributions)
 		if err != nil {
-			app.writeJSONError(w,http.StatusInternalServerError,err)
+			app.writeJSONError(w, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -214,11 +211,10 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	if generateExcel == "true" {
 		file, err := app.fundsModel.GenerateExcelFile(contributions)
 		if err != nil {
-			app.writeJSONError(w,http.StatusInternalServerError,err)
+			app.writeJSONError(w, http.StatusInternalServerError, err)
 			return
 		}
 
@@ -229,6 +225,28 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.writeJSON(w, http.StatusOK, envelope{"data": contributions, "pageInfo": pageInfo})
+}
+
+func (app *application) getSummary(w http.ResponseWriter, r *http.Request) {
+	qs := r.URL.Query()
+
+	startDate, hasFrom := app.readDateParam(qs, "from")
+	endDate, hasTo := app.readDateParam(qs, "to")
+
+	if !hasFrom || !hasTo {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing from and/or to request param"))
+		return
+	}
+
+	file, err := app.fundsModel.GetSummary(startDate, endDate, 1)
+	if err != nil {
+		app.writeJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", "attachment; filename=contributions-summary.xlsx")
+	w.Write(file)
 }
 
 func (app *application) upload(w http.ResponseWriter, r *http.Request) {
@@ -253,19 +271,19 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r),file)
+	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r), file)
 
 	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 
 }
 
-func (app *application) getCategories(w http.ResponseWriter, r *http.Request){
+func (app *application) getCategories(w http.ResponseWriter, r *http.Request) {
 	data := app.fundsModel.GetCategories()
 
 	if data == nil {
-		app.writeJSON(w,http.StatusOK,make([]string,0))
+		app.writeJSON(w, http.StatusOK, make([]string, 0))
 		return
 	}
 
-	app.writeJSON(w,http.StatusOK,data)
+	app.writeJSON(w, http.StatusOK, data)
 }

@@ -82,7 +82,7 @@ func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.Im
 
 			excelData = append(excelData, imports.ImportModel{
 				Name:      exImport.escapeSingleQuote(&rows[i][0]),
-				ReceiptNo: rows[i][1],
+				ReceiptNo: rows[i][1] + "/" + "KCS-" + strconv.Itoa(int(time.Now().UnixMilli())),
 				Total:     total,
 				Date:      t,
 				BreakDown: breakdown})

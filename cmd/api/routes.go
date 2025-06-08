@@ -19,6 +19,7 @@ func (app *application) routes() http.Handler {
 	subRouter.Handle("/contributions/variance", app.requiresAuthenticatedUser(app.getStatisticalVariance)).Methods("GET")
 	subRouter.Handle("/contributions/categories/all", app.requiresAuthenticatedUser(app.getCategories)).Methods("GET")
 	subRouter.Handle("/contributions/{id}", app.requiresAuthenticatedUser(app.updateContribution)).Methods("PUT")
+	subRouter.Handle("/contributions/summary", app.requiresAuthenticatedUser(app.getSummary)).Methods("GET")
 
 	// user
 	subRouter.HandleFunc("/auth/signup", app.createUser).Methods("POST")

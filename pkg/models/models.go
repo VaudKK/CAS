@@ -60,6 +60,12 @@ type MonthlyStats struct {
 	Value float64 `json:"value"`
 }
 
+type MonthlySummations struct {
+	Category string
+	Date     string
+	Total    float64
+}
+
 type StatisticalVariance struct {
 	Category      string
 	Total         float64
