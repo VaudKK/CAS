@@ -231,10 +231,10 @@ func (app *application) getSummary(w http.ResponseWriter, r *http.Request) {
 	qs := r.URL.Query()
 
 	startDate, hasFrom := app.readDateParam(qs, "from")
-	endDate, hasTo := app.readDateParam(qs, "to")
+	endDate, _ := app.readDateParam(qs, "to")
 
-	if !hasFrom || !hasTo {
-		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing from and/or to request param"))
+	if !hasFrom  {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing from request param"))
 		return
 	}
 

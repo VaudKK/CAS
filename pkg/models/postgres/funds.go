@@ -22,6 +22,7 @@ type FundsModel struct {
 	DB *sql.DB
 	ExcelExporter *exporter.ExcelExport
 	PdfExporter *pdf_exporter.PdfExport
+	Logger *utils.CLogger
 }
 
 
@@ -209,6 +210,8 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 		return nil, utils.PageInfo{}, err
 	}
 
+	m.Logger.InfoLog.Printf("Found %d contributions for search: %s", len(contributions), searchString)
+
 	return contributions, pageInfo, nil
 }
 
@@ -255,13 +258,32 @@ func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable ut
 }
 
 func (m *FundsModel) GetSummary(startDate, endDate time.Time,organizationId int) ([]byte,error){
-	stmt := `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
+	var stmt string
+
+	if(!startDate.IsZero() && endDate.IsZero()){
+		stmt = `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
+			from funds, jsonb_each(funds.break_down)
+			where organization_id = $1 AND contribution_date = $2 
+			group by contribution_date,key
+			order by contribution_date;`
+	}else if(!startDate.IsZero() && !endDate.IsZero()){
+		stmt = `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
 			from funds, jsonb_each(funds.break_down)
 			where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
 			group by contribution_date,key
 			order by contribution_date;`
+	}else{
+		return nil, fmt.Errorf("start date and end date cannot be both empty")
+	}
 
-	rows, err := m.DB.Query(stmt, 1, startDate, endDate)
+    var rows *sql.Rows
+	var err error
+
+	if endDate.IsZero() {
+		rows, err = m.DB.Query(stmt, organizationId, startDate)
+	} else {
+		rows, err = m.DB.Query(stmt, organizationId, startDate, endDate)
+	}
 
 	if err != nil {
 		return nil, err

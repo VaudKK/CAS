@@ -86,7 +86,10 @@ func run(application *application) {
 	application.fundsModel = &postgres.FundsModel{
 		DB: db,
 		ExcelExporter: &excel_exports.ExcelExport{},
-		PdfExporter:   &pdf_exports.PdfExport{},
+		PdfExporter:   &pdf_exports.PdfExport{
+			Logger: utils.GetLoggerInstance(),
+		},
+		Logger: 	utils.GetLoggerInstance(),
 	}
 
 	application.userModel = &postgres.UserModel{

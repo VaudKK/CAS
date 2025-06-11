@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"github.com/VaudKK/CAS/pkg/models"
+	"github.com/VaudKK/CAS/utils"
 	"github.com/signintech/gopdf"
 )
 
 
 type PdfExport struct {
+	Logger *utils.CLogger
 }
 
 const (
@@ -49,6 +51,11 @@ func (pdfExport *PdfExport) GeneratePdfFile(data []*models.Fund, categories []st
     pages := ((totalRows * 2) + rowsPerPage - 1) / rowsPerPage
 
     rowIndex := 0
+
+	// prevents having a zero paged document
+	if pages == 1 {
+		pages = 2
+	}
 
     for page := 0; page < pages/2; page++ {
         pdf.AddPage()

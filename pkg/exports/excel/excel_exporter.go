@@ -158,7 +158,7 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 }
 
 
-func (exExport *ExcelExport)GenerateExcelSummary(data map[string][]models.MonthlySummations,
+func (exExport *ExcelExport) GenerateExcelSummary(data map[string][]models.MonthlySummations,
 	categories []string) ([]byte,error){
 
 	f := excelize.NewFile()
