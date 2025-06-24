@@ -4,18 +4,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"mime/multipart"
 	"strconv"
 	"strings"
 	"time"
 
+	"slices"
+
 	exporter "github.com/VaudKK/CAS/pkg/exports/excel"
 	pdf_exporter "github.com/VaudKK/CAS/pkg/exports/pdf"
 	"github.com/VaudKK/CAS/pkg/imports/excel"
 	"github.com/VaudKK/CAS/pkg/models"
 	"github.com/VaudKK/CAS/utils"
-	"slices"
 )
 
 type FundsModel struct {
@@ -25,10 +27,33 @@ type FundsModel struct {
 	Logger *utils.CLogger
 }
 
+func (m *FundsModel) ValidateFile(file multipart.File, fileName string) ([]byte,error) {
+	fileData, err := io.ReadAll(file)
 
-func (m *FundsModel) ProcessExcelFile(currentUser *models.User,file multipart.File) {
+	if err != nil {
+		utils.GetLoggerInstance().ErrorLog.Println(err)
+		return nil,err
+	}
+
+	defer file.Close()
+
+	hash := utils.HashFile(fileData)
+
+	err  = m.SaveFileHash(hash,fileName,1)
+
+	if err != nil {
+		utils.GetLoggerInstance().ErrorLog.Println(err)
+		return nil,err
+	}
+
+	return fileData,nil
+}
+
+
+func (m *FundsModel) ProcessExcelFile(currentUser *models.User,fileData []byte,fileName string) {
 	excelModel := excel.ExcelImport{}
-	data, categories, err := excelModel.ProcessExcelFile(file)
+
+	data, categories, err := excelModel.ProcessExcelFile(fileData)
 
 	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println(err)
@@ -79,8 +104,12 @@ func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fun
 			continue
 		}
 
+		if contribution.ReceiptNo == "" {
+			contribution.ReceiptNo = "KCS-" + strconv.Itoa(int(time.Now().UnixMilli()))
+		}
+
 		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s',%s)", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
-			strings.ToUpper(contribution.Contributor), "KCS-" + strconv.Itoa(int(time.Now().UnixMilli())),strconv.Itoa(currentUser.ID))
+			strings.ToUpper(contribution.Contributor),contribution.ReceiptNo,strconv.Itoa(currentUser.ID))
 
 		if i != len(contributions)-1 {
 			s += ","
@@ -150,6 +179,8 @@ func (m *FundsModel) UpdateContribution(id int,updateFund *models.UpdateFund) (i
 		return 0, err
 	}
 
+	m.Logger.InfoLog.Printf("Updated contribution with ID %d, rows affected: %d", id, rowAffected)
+
 	return int(rowAffected), nil
 }
 
@@ -163,13 +194,20 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 				FROM funds
 				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
 				ORDER BY created_at DESC LIMIT $2 OFFSET $3;`
-	}else{
+	}else if !startDate.IsZero() && !endDate.IsZero() {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
 				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
 				AND contribution_date BETWEEN $2 AND $3
 				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
+	}else if !startDate.IsZero() {
+		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
+						contributor,break_down,created_at,modified_at 
+				FROM funds
+				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				AND contribution_date = $2
+				ORDER BY created_at DESC LIMIT $3 OFFSET $4;`
 	}
 	
 
@@ -193,8 +231,10 @@ func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.
 
 	if startDate.IsZero() && endDate.IsZero() {
 		rows, err = m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
-	}else{
+	}else if !startDate.IsZero() && !endDate.IsZero() {
 		rows, err = m.DB.Query(query, 1,startDate,endDate, pageable.Size, pageable.OffSet)
+	}else if !startDate.IsZero() {
+  		rows, err = m.DB.Query(query, 1,startDate, pageable.Size, pageable.OffSet)
 	}
 	
 
@@ -514,6 +554,24 @@ func (m *FundsModel) GetCategories() []string{
 	return categories
 }
 
+func (m *FundsModel) SaveFileHash(hash,filename string,organizationId int) error {
+	stmt := `INSERT INTO imports(hash,filename,organization_id) VALUES ($1,$2,$3);`
+
+	result,err := m.DB.Exec(stmt,hash,filename,organizationId)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = result.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func makeCategoriesUnique(newCategories *[]string,existingCategories []string) []string{
 	categoriesToSave := make([]string,0)
 
@@ -594,10 +652,10 @@ func (m *FundsModel) GenerateExcelFile(contributions []*models.Fund) ([]byte, er
 	return excelFile,nil
 }
 
-func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund) ([]byte, error) {
+func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund,startDate,endDate time.Time) ([]byte, error) {
 	categories := m.GetCategories()
 
-	pdfFile, err := m.PdfExporter.GeneratePdfFile(contributions,categories)
+	pdfFile, err := m.PdfExporter.GeneratePdfFile(contributions,categories,startDate,endDate)
 
 	if err != nil {
 		return nil, err

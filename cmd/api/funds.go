@@ -199,7 +199,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if generatePdf == "true" {
-		file, err := app.fundsModel.GeneratePdfFile(contributions)
+		file, err := app.fundsModel.GeneratePdfFile(contributions,dateFrom, dateTo)
 		if err != nil {
 			app.writeJSONError(w, http.StatusInternalServerError, err)
 			return
@@ -271,7 +271,14 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r), file)
+	data,err := app.fundsModel.ValidateFile(file,fileName)
+	
+	if err != nil {
+		app.writeJSONError(w, http.StatusBadRequest, errors.New("file has already been uploaded or could not be saved"))
+		return
+	}
+
+	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r),data,fileName)
 
 	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 

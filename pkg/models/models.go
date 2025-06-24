@@ -34,7 +34,7 @@ type Fund struct {
 
 type UpdateFund struct {
 	Contributor string             `json:"contributor"`
-	Date        time.Time          `json:"date"`
+	Date        string             `json:"date"`
 	Total       float64            `json:"total"`
 	BreakDown   map[string]float64 `json:"breakDown"`
 }

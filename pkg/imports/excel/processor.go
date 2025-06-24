@@ -2,8 +2,8 @@ package excel
 
 import (
 	"bytes"
-	"io"
-	"mime/multipart"
+	"crypto/sha256"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -15,16 +15,9 @@ import (
 type ExcelImport struct {
 }
 
-func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.ImportModel,[]string, error) {
-	defer file.Close()
+func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportModel,[]string, error) {
 
 	uniqueCategories := make(map[string]bool,0)
-
-	data, err := io.ReadAll(file)
-
-	if err != nil {
-		return []imports.ImportModel{},nil, err
-	}
 
 	f, err := excelize.OpenReader(bytes.NewReader(data))
 
@@ -82,7 +75,7 @@ func (exImport *ExcelImport) ProcessExcelFile(file multipart.File) ([]imports.Im
 
 			excelData = append(excelData, imports.ImportModel{
 				Name:      exImport.escapeSingleQuote(&rows[i][0]),
-				ReceiptNo: rows[i][1] + "/" + "KCS-" + strconv.Itoa(int(time.Now().UnixMilli())),
+				ReceiptNo: rows[i][1],
 				Total:     total,
 				Date:      t,
 				BreakDown: breakdown})
@@ -151,4 +144,10 @@ func (exImport *ExcelImport) convertMapToStringArray(uniqueCategories map[string
 	}
 
 	return categories
+}
+
+func HashFile(data []byte) string {
+	hashObject := sha256.New()
+	hashObject.Write(data)
+	return fmt.Sprintf("%x", hashObject.Sum(nil))
 }
