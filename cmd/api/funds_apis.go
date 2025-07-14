@@ -163,6 +163,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	dateTo, hasTo := app.readDateParam(qs, "to")
 	generateExcel := qs.Get("generateExcel")
 	generatePdf := qs.Get("generatePdf")
+	exact := qs.Get("exact")
 
 	pageable := utils.Pageable{
 		Page:   page,
@@ -183,7 +184,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if searchTerm != "" {
-		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm, dateFrom, dateTo, pageable)
+		contributions, pageInfo, err = app.fundsModel.FullTextSearch(searchTerm, exact == "true", dateFrom, dateTo, pageable)
 	} else if hasFrom && hasTo {
 		contributions, pageInfo, err = app.fundsModel.SearchByDateRange(dateFrom, dateTo, pageable)
 	} else if hasFrom && !hasTo {
@@ -199,7 +200,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if generatePdf == "true" {
-		file, err := app.fundsModel.GeneratePdfFile(contributions,dateFrom, dateTo)
+		file, err := app.fundsModel.GeneratePdfFile(contributions, dateFrom, dateTo)
 		if err != nil {
 			app.writeJSONError(w, http.StatusInternalServerError, err)
 			return
@@ -233,7 +234,7 @@ func (app *application) getSummary(w http.ResponseWriter, r *http.Request) {
 	startDate, hasFrom := app.readDateParam(qs, "from")
 	endDate, _ := app.readDateParam(qs, "to")
 
-	if !hasFrom  {
+	if !hasFrom {
 		app.writeJSONError(w, http.StatusBadRequest, errors.New("missing from request param"))
 		return
 	}
@@ -271,14 +272,14 @@ func (app *application) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data,err := app.fundsModel.ValidateFile(file,fileName)
-	
+	data, err := app.fundsModel.ValidateFile(file, fileName)
+
 	if err != nil {
 		app.writeJSONError(w, http.StatusBadRequest, errors.New("file has already been uploaded or could not be saved"))
 		return
 	}
 
-	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r),data,fileName)
+	go app.fundsModel.ProcessExcelFile(app.contextGetUser(r), data, fileName)
 
 	app.writeJSON(w, http.StatusOK, map[string]string{"message": "file uploaded successfully"})
 

@@ -86,6 +86,8 @@ func (app *application) createUser(w http.ResponseWriter, r *http.Request) {
 func (app *application) sendOtp(w http.ResponseWriter, r *http.Request){
 	email := r.URL.Query().Get("email")
 
+	
+
 	if email == "" {
 		app.writeJSONError(w,http.StatusBadRequest,errors.New("email parameter missing"))
 		return

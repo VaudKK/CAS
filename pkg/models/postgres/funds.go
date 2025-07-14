@@ -21,36 +21,35 @@ import (
 )
 
 type FundsModel struct {
-	DB *sql.DB
+	DB            *sql.DB
 	ExcelExporter *exporter.ExcelExport
-	PdfExporter *pdf_exporter.PdfExport
-	Logger *utils.CLogger
+	PdfExporter   *pdf_exporter.PdfExport
+	Logger        *utils.CLogger
 }
 
-func (m *FundsModel) ValidateFile(file multipart.File, fileName string) ([]byte,error) {
+func (m *FundsModel) ValidateFile(file multipart.File, fileName string) ([]byte, error) {
 	fileData, err := io.ReadAll(file)
 
 	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println(err)
-		return nil,err
+		return nil, err
 	}
 
 	defer file.Close()
 
 	hash := utils.HashFile(fileData)
 
-	err  = m.SaveFileHash(hash,fileName,1)
+	err = m.SaveFileHash(hash, fileName, 1)
 
 	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println(err)
-		return nil,err
+		return nil, err
 	}
 
-	return fileData,nil
+	return fileData, nil
 }
 
-
-func (m *FundsModel) ProcessExcelFile(currentUser *models.User,fileData []byte,fileName string) {
+func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte, fileName string) {
 	excelModel := excel.ExcelImport{}
 
 	data, categories, err := excelModel.ProcessExcelFile(fileData)
@@ -83,7 +82,7 @@ func (m *FundsModel) ProcessExcelFile(currentUser *models.User,fileData []byte,f
 
 	utils.GetLoggerInstance().InfoLog.Printf("Inserted %d categories", insertedCategories)
 
-	inserted, err := m.Insert(currentUser,funds)
+	inserted, err := m.Insert(currentUser, funds)
 
 	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println(err)
@@ -109,7 +108,7 @@ func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fun
 		}
 
 		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s',%s)", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
-			strings.ToUpper(contribution.Contributor),contribution.ReceiptNo,strconv.Itoa(currentUser.ID))
+			strings.ToUpper(contribution.Contributor), contribution.ReceiptNo, strconv.Itoa(currentUser.ID))
 
 		if i != len(contributions)-1 {
 			s += ","
@@ -157,20 +156,20 @@ func (m *FundsModel) GetContributions(organizationId int, pageable utils.Pageabl
 	return contributions, pageInfo, nil
 }
 
-func (m *FundsModel) UpdateContribution(id int,updateFund *models.UpdateFund) (int,error){
+func (m *FundsModel) UpdateContribution(id int, updateFund *models.UpdateFund) (int, error) {
 	stmt := `UPDATE funds SET total = $1,contribution_date = $2,contributor = $3,break_down = $4 WHERE
 				id = $5;`
 
 	breakDown, err := json.Marshal(updateFund.BreakDown)
 
 	if err != nil {
-		return 0,err
+		return 0, err
 	}
 
-	result, err := m.DB.Exec(stmt,updateFund.Total,updateFund.Date,strings.ToUpper(updateFund.Contributor),string(breakDown),id)
+	result, err := m.DB.Exec(stmt, updateFund.Total, updateFund.Date, strings.ToUpper(updateFund.Contributor), string(breakDown), id)
 
 	if err != nil {
-		return 0,err
+		return 0, err
 	}
 
 	rowAffected, err := result.RowsAffected()
@@ -184,59 +183,65 @@ func (m *FundsModel) UpdateContribution(id int,updateFund *models.UpdateFund) (i
 	return int(rowAffected), nil
 }
 
-func (m *FundsModel) FullTextSearch(searchString string,startDate, endDate time.Time,pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
+func (m *FundsModel) FullTextSearch(searchString string, exact bool, startDate, endDate time.Time, pageable utils.Pageable) ([]*models.Fund, utils.PageInfo, error) {
 
 	var query string
 
-	if startDate.IsZero()  && endDate.IsZero() {
+	match := "(to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))"
+
+	if exact {
+		match = fmt.Sprintf("(contributor ILIKE '%%%s%%' OR receipt_no ILIKE '%%%s%%')", searchString, searchString)
+	}
+
+	if startDate.IsZero() && endDate.IsZero() {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
-				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				where organization_id = $1 AND ` + match + `
 				ORDER BY created_at DESC LIMIT $2 OFFSET $3;`
-	}else if !startDate.IsZero() && !endDate.IsZero() {
+	} else if !startDate.IsZero() && !endDate.IsZero() {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
-				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				where organization_id = $1 AND ` + match + `
 				AND contribution_date BETWEEN $2 AND $3
 				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
-	}else if !startDate.IsZero() {
+	} else if !startDate.IsZero() {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
-				where organization_id = $1 AND (to_tsvector(contributor || ' ' || receipt_no) @@ to_tsquery('%s'))
+				where organization_id = $1 AND ` + match + `
 				AND contribution_date = $2
 				ORDER BY created_at DESC LIMIT $3 OFFSET $4;`
 	}
-	
 
-	tokens := strings.Split(searchString, " ")
-	searchTerms := ""
+	if !exact {
+		tokens := strings.Split(searchString, " ")
+		searchTerms := ""
 
-	for i, token := range tokens {
-		if token != "" {
-			if i == len(tokens)-1 {
-				searchTerms += token + ":*"
-			} else {
-				searchTerms += token + ":* | "
-			}
+		for i, token := range tokens {
+			if token != "" {
+				if i == len(tokens)-1 {
+					searchTerms += token + ":*"
+				} else {
+					searchTerms += token + ":* | "
+				}
 		}
 	}
 
 	query = fmt.Sprintf(query, searchTerms)
+	}
 
 	var rows *sql.Rows
 	var err error
 
 	if startDate.IsZero() && endDate.IsZero() {
 		rows, err = m.DB.Query(query, 1, pageable.Size, pageable.OffSet)
-	}else if !startDate.IsZero() && !endDate.IsZero() {
-		rows, err = m.DB.Query(query, 1,startDate,endDate, pageable.Size, pageable.OffSet)
-	}else if !startDate.IsZero() {
-  		rows, err = m.DB.Query(query, 1,startDate, pageable.Size, pageable.OffSet)
+	} else if !startDate.IsZero() && !endDate.IsZero() {
+		rows, err = m.DB.Query(query, 1, startDate, endDate, pageable.Size, pageable.OffSet)
+	} else if !startDate.IsZero() {
+		rows, err = m.DB.Query(query, 1, startDate, pageable.Size, pageable.OffSet)
 	}
-	
 
 	if err != nil {
 		return nil, utils.PageInfo{}, err
@@ -264,23 +269,22 @@ func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable ut
 				FROM funds
 				where organization_id = $1 AND contribution_date = $2
 				ORDER BY created_at DESC LIMIT $3 OFFSET $4;`
-	}else{
+	} else {
 		query = `SELECT count(*) OVER(), id,receipt_no,total,organization_id,contribution_date,
 						contributor,break_down,created_at,modified_at 
 				FROM funds
 				where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
 				ORDER BY created_at DESC LIMIT $4 OFFSET $5;`
 	}
-	
+
 	var rows *sql.Rows
 	var err error
 
 	if endDate.IsZero() {
-		rows,err = m.DB.Query(query,1,startDate,pageable.Size,pageable.OffSet)
-	}else{
-		rows,err = m.DB.Query(query,1,startDate,endDate,pageable.Size,pageable.OffSet)
+		rows, err = m.DB.Query(query, 1, startDate, pageable.Size, pageable.OffSet)
+	} else {
+		rows, err = m.DB.Query(query, 1, startDate, endDate, pageable.Size, pageable.OffSet)
 	}
-	
 
 	if err != nil {
 		return nil, utils.PageInfo{}, err
@@ -297,26 +301,26 @@ func (m *FundsModel) SearchByDateRange(startDate, endDate time.Time, pageable ut
 	return contributions, pageInfo, nil
 }
 
-func (m *FundsModel) GetSummary(startDate, endDate time.Time,organizationId int) ([]byte,error){
+func (m *FundsModel) GetSummary(startDate, endDate time.Time, organizationId int) ([]byte, error) {
 	var stmt string
 
-	if(!startDate.IsZero() && endDate.IsZero()){
+	if !startDate.IsZero() && endDate.IsZero() {
 		stmt = `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
 			from funds, jsonb_each(funds.break_down)
 			where organization_id = $1 AND contribution_date = $2 
 			group by contribution_date,key
 			order by contribution_date;`
-	}else if(!startDate.IsZero() && !endDate.IsZero()){
+	} else if !startDate.IsZero() && !endDate.IsZero() {
 		stmt = `SELECT key as name, sum(value::jsonb::text::numeric) as value,contribution_date
 			from funds, jsonb_each(funds.break_down)
 			where organization_id = $1 AND contribution_date BETWEEN $2 AND $3
 			group by contribution_date,key
 			order by contribution_date;`
-	}else{
+	} else {
 		return nil, fmt.Errorf("start date and end date cannot be both empty")
 	}
 
-    var rows *sql.Rows
+	var rows *sql.Rows
 	var err error
 
 	if endDate.IsZero() {
@@ -337,7 +341,7 @@ func (m *FundsModel) GetSummary(startDate, endDate time.Time,organizationId int)
 	for rows.Next() {
 		row := &models.MonthlySummations{}
 
-		err := rows.Scan(&row.Category, &row.Total,&row.Date)
+		err := rows.Scan(&row.Category, &row.Total, &row.Date)
 
 		if err != nil {
 			return nil, err
@@ -348,28 +352,28 @@ func (m *FundsModel) GetSummary(startDate, endDate time.Time,organizationId int)
 
 	for _, row := range data {
 		if value, ok := summary[row.Date]; ok {
-			value = append(value,models.MonthlySummations{
+			value = append(value, models.MonthlySummations{
 				Category: row.Category,
-				Date: row.Date,
-				Total: row.Total,
+				Date:     row.Date,
+				Total:    row.Total,
 			})
 			summary[row.Date] = value
-		}else{
+		} else {
 			list := []models.MonthlySummations{}
 			list = append(list, models.MonthlySummations{
 				Category: row.Category,
-				Date: row.Date,
-				Total: row.Total,
+				Date:     row.Date,
+				Total:    row.Total,
 			})
 
 			summary[row.Date] = list
 		}
 	}
 
-	file,err := m.GenerateExcelSummaryFile(summary)
+	file, err := m.GenerateExcelSummaryFile(summary)
 
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	return file, nil
@@ -407,7 +411,7 @@ func (m *FundsModel) GetMonthlyStatistics(year, month, organizationId int) ([]*m
 	return stats, nil
 }
 
-func (m *FundsModel) GetMonthlyVariance(targetCategories []string)([]*models.Variance,error){
+func (m *FundsModel) GetMonthlyVariance(targetCategories []string) ([]*models.Variance, error) {
 	stmt := `WITH previous AS (SELECT key as prev_category,sum(value::jsonb::text::numeric) as prev_total
 				FROM funds, jsonb_each(funds.break_down) 
 				WHERE extract(month from contribution_date) =
@@ -435,7 +439,7 @@ func (m *FundsModel) GetMonthlyVariance(targetCategories []string)([]*models.Var
 	for rows.Next() {
 		row := &models.StatisticalVariance{}
 
-		err := rows.Scan(&row.Category,&row.Total,&row.PreviousTotal,&row.Difference)
+		err := rows.Scan(&row.Category, &row.Total, &row.PreviousTotal, &row.Difference)
 
 		if err != nil {
 			return nil, err
@@ -446,55 +450,55 @@ func (m *FundsModel) GetMonthlyVariance(targetCategories []string)([]*models.Var
 
 	statistics := []*models.Variance{}
 
-	for _,category := range targetCategories {
-		variance := getTargetCategory(category,stats)
+	for _, category := range targetCategories {
+		variance := getTargetCategory(category, stats)
 
-		if(variance != nil){
+		if variance != nil {
 
 			var percentage float64
 
-			if(variance.PreviousTotal == 0){
+			if variance.PreviousTotal == 0 {
 				percentage = 100.0
-			}else{
+			} else {
 				percentage = ((variance.Total - variance.PreviousTotal) / math.Abs(variance.PreviousTotal)) * 100.0
 			}
-			
+
 			direction := 0
 
 			if percentage > 0 {
 				direction = 1
-			}else if percentage < 0 {
+			} else if percentage < 0 {
 				direction = -1
 			}
 
 			vars := models.Variance{
-				Category: variance.Category,
+				Category:     variance.Category,
 				CurrentValue: variance.Total,
-				Percentage: float32(percentage),
-				Direction: int8(direction),
+				Percentage:   float32(percentage),
+				Direction:    int8(direction),
 			}
 
 			statistics = append(statistics, &vars)
-		}else{
+		} else {
 			vars := models.Variance{
-				Category: category,
+				Category:     category,
 				CurrentValue: 0,
-				Percentage: 0.00,
-				Direction: 0,
+				Percentage:   0.00,
+				Direction:    0,
 			}
 			statistics = append(statistics, &vars)
 		}
 	}
 
-	return statistics,nil
+	return statistics, nil
 }
 
 func (m *FundsModel) SaveCategories(categories []string) (int, error) {
 
-	distinctCategories := makeCategoriesUnique(&categories,m.GetCategories())
+	distinctCategories := makeCategoriesUnique(&categories, m.GetCategories())
 
 	if len(distinctCategories) == 0 {
-		return 0,nil
+		return 0, nil
 	}
 
 	stmt := `INSERT INTO fund_categories(name) VALUES`
@@ -526,38 +530,38 @@ func (m *FundsModel) SaveCategories(categories []string) (int, error) {
 	return int(rowAffected), nil
 }
 
-func (m *FundsModel) GetCategories() []string{
+func (m *FundsModel) GetCategories() []string {
 	stmt := `SELECT DISTINCT(name) FROM public.fund_categories;`
 
-	rows,err := m.DB.Query(stmt)
+	rows, err := m.DB.Query(stmt)
 
-	if err != nil{
+	if err != nil {
 		utils.GetLoggerInstance().ErrorLog.Println("Error while fetching categories ", err)
 		return nil
 	}
 
 	defer rows.Close()
 
-	categories := make([]string,0)
+	categories := make([]string, 0)
 
-	for rows.Next(){
+	for rows.Next() {
 		value := ""
 		err := rows.Scan(&value)
-		if err != nil{
+		if err != nil {
 			utils.GetLoggerInstance().ErrorLog.Println("Error reading categories ", err)
 			return nil
 		}
 
-		categories = append(categories,value)
+		categories = append(categories, value)
 	}
 
 	return categories
 }
 
-func (m *FundsModel) SaveFileHash(hash,filename string,organizationId int) error {
+func (m *FundsModel) SaveFileHash(hash, filename string, organizationId int) error {
 	stmt := `INSERT INTO imports(hash,filename,organization_id) VALUES ($1,$2,$3);`
 
-	result,err := m.DB.Exec(stmt,hash,filename,organizationId)
+	result, err := m.DB.Exec(stmt, hash, filename, organizationId)
 
 	if err != nil {
 		return err
@@ -572,11 +576,11 @@ func (m *FundsModel) SaveFileHash(hash,filename string,organizationId int) error
 	return nil
 }
 
-func makeCategoriesUnique(newCategories *[]string,existingCategories []string) []string{
-	categoriesToSave := make([]string,0)
+func makeCategoriesUnique(newCategories *[]string, existingCategories []string) []string {
+	categoriesToSave := make([]string, 0)
 
-	for _, category := range *newCategories{
-		if !slices.Contains(existingCategories,category) {
+	for _, category := range *newCategories {
+		if !slices.Contains(existingCategories, category) {
 			categoriesToSave = append(categoriesToSave, category)
 		}
 	}
@@ -619,7 +623,7 @@ func mapSqlRowsToModel(rows *sql.Rows, pageable utils.Pageable) ([]*models.Fund,
 	return contributions, pageInfo
 }
 
-func getTargetCategory(target string,data []*models.StatisticalVariance) *models.StatisticalVariance{
+func getTargetCategory(target string, data []*models.StatisticalVariance) *models.StatisticalVariance {
 	for _, stat := range data {
 		if strings.EqualFold(target, stat.Category) {
 			return stat
@@ -629,7 +633,7 @@ func getTargetCategory(target string,data []*models.StatisticalVariance) *models
 	return nil
 }
 
-func (app *FundsModel)ValidateTotalAndBreakDown(total float64, breakDown map[string]float64)  bool {
+func (app *FundsModel) ValidateTotalAndBreakDown(total float64, breakDown map[string]float64) bool {
 	var sum float64
 
 	for _, value := range breakDown {
@@ -643,37 +647,37 @@ func (m *FundsModel) GenerateExcelFile(contributions []*models.Fund) ([]byte, er
 
 	categories := m.GetCategories()
 
-	excelFile, err := m.ExcelExporter.GenerateExcelFile(contributions,categories)
+	excelFile, err := m.ExcelExporter.GenerateExcelFile(contributions, categories)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return excelFile,nil
+	return excelFile, nil
 }
 
-func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund,startDate,endDate time.Time) ([]byte, error) {
+func (m *FundsModel) GeneratePdfFile(contributions []*models.Fund, startDate, endDate time.Time) ([]byte, error) {
 	categories := m.GetCategories()
 
-	pdfFile, err := m.PdfExporter.GeneratePdfFile(contributions,categories,startDate,endDate)
+	pdfFile, err := m.PdfExporter.GeneratePdfFile(contributions, categories, startDate, endDate)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return pdfFile,nil
+	return pdfFile, nil
 }
 
-func (m *FundsModel) GenerateExcelSummaryFile(data map[string][]models.MonthlySummations) ([]byte,error){
+func (m *FundsModel) GenerateExcelSummaryFile(data map[string][]models.MonthlySummations) ([]byte, error) {
 	categories := m.GetCategories()
 
-	excelFile,err := m.ExcelExporter.GenerateExcelSummary(
+	excelFile, err := m.ExcelExporter.GenerateExcelSummary(
 		data,
-	categories)
+		categories)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return excelFile,nil
+	return excelFile, nil
 }
