@@ -43,17 +43,17 @@ func main() {
 	flag.StringVar(&cfg.dbUrl, "dbUrl", "postgres://postgres:root@localhost:5432/casdb?sslmode=disable", "Database Url postgres://{user}:{password}@{hostname}:{port}/{database-name}")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|production)")
 
-	// flag.StringVar(&cfg.smtp.host, "smtp-host", "live.smtp.mailtrap.io", "SMTP host")
-	// flag.IntVar(&cfg.smtp.port, "smtp-port", 587, "SMTP port")
-	// flag.StringVar(&cfg.smtp.username, "smtp-username", "api", "SMTP username")
-	// flag.StringVar(&cfg.smtp.password, "smtp-password", "6fb9bcdaf21db5520a71eb4e02edf68f", "SMTP password")
-	// flag.StringVar(&cfg.smtp.sender, "smtp-sender", "CAS <no-reply@demomailtrap.co>", "SMTP sender")
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "live.smtp.mailtrap.io", "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", 587, "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "api", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "ddc03a96f5541dbd293c4e6a7371212a", "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "KCSDA <noreply@kcsda.or.ke>", "SMTP sender")
 
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
-	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP port")
-	flag.StringVar(&cfg.smtp.username, "smtp-username", "5f7aeca5180126", "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-password", "dfa110cb72fb74", "SMTP password")
-	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "CAS <no-reply@churchaccountingsystem>", "SMTP sender")
+	// flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
+	// flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP port")
+	// flag.StringVar(&cfg.smtp.username, "smtp-username", "5f7aeca5180126", "SMTP username")
+	// flag.StringVar(&cfg.smtp.password, "smtp-password", "dfa110cb72fb74", "SMTP password")
+	// flag.StringVar(&cfg.smtp.sender, "smtp-sender", "CAS <no-reply@churchaccountingsystem>", "SMTP sender")
 
 	flag.Parse()
 
@@ -94,6 +94,7 @@ func run(application *application) {
 
 	application.userModel = &postgres.UserModel{
 		DB: db,
+		Mailer: &application.mailer,
 	}
 
 	application.otpModel = &postgres.OtpModel{
