@@ -45,7 +45,7 @@ func (m *UserModel) CreateUser(user *models.User) (int, error) {
 }
 
 func (m *UserModel) ValidateUser(username, password string) (bool, error) {
-	stmt := `SELECT email,password FROM users WHERE email = $1 AND active = true`
+	stmt := `SELECT email,password FROM users WHERE email = $1 AND active = true AND verified = true`
 
 	row, err := m.DB.Query(stmt, username)
 

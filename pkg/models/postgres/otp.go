@@ -99,11 +99,11 @@ func (m *OtpModel) VerifyOtp(otp, sessionId string) (bool, error) {
 		return false, err
 	}
 
-	err = m.User.VerifyUser(data.subject)
+	// err = m.User.VerifyUser(data.subject)
 
-	if err != nil {
-		return false, err
-	}
+	// if err != nil {
+	// 	return false, err
+	// }
 
 	return true, nil
 }

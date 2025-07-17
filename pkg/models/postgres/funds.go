@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -49,14 +50,31 @@ func (m *FundsModel) ValidateFile(file multipart.File, fileName string) ([]byte,
 	return fileData, nil
 }
 
-func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte, fileName string) {
+func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte, fileName string) error {
+	ctx := context.Background()
+
+	tx,err := m.DB.BeginTx(ctx,nil)
+	if err != nil {
+		m.Logger.ErrorLog.Printf("Error while starting db transaction: %s",err.Error())
+		return err
+	}
+
+	defer func(){
+		if r := recover(); r != nil{
+			tx.Rollback()
+			m.Logger.ErrorLog.Fatalf("Error while processing excel data: %v",err)
+		}
+
+		tx.Rollback()
+	}()
+
 	excelModel := excel.ExcelImport{}
 
 	data, categories, err := excelModel.ProcessExcelFile(fileData)
 
 	if err != nil {
-		utils.GetLoggerInstance().ErrorLog.Println(err)
-		return
+		m.Logger.ErrorLog.Printf("Error while processing excel data: %v", err)
+		return err
 	}
 
 	funds := make([]models.Fund, 0)
@@ -73,26 +91,54 @@ func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte,
 		funds = append(funds, fund)
 	}
 
-	insertedCategories, err := m.SaveCategories(categories)
+	insertedCategories, err := m.SaveCategories(tx,ctx,categories)
 
 	if err != nil {
-		utils.GetLoggerInstance().ErrorLog.Println(err)
-		return
+		m.Logger.ErrorLog.Printf("Error while saving categories: %v", err)
+		return err
 	}
 
-	utils.GetLoggerInstance().InfoLog.Printf("Inserted %d categories", insertedCategories)
+	utils.GetLoggerInstance().InfoLog.Printf("Will insert %d categories", insertedCategories)
 
-	inserted, err := m.Insert(currentUser, funds)
+	inserted, err := m.insert(tx,ctx,currentUser, funds)
 
 	if err != nil {
-		utils.GetLoggerInstance().ErrorLog.Println(err)
-		return
+		m.Logger.ErrorLog.Printf("Error while saving contributions: %v", err)
+		return err
 	}
 
-	utils.GetLoggerInstance().InfoLog.Printf("Inserted %d funds", inserted)
+	utils.GetLoggerInstance().InfoLog.Printf("Will insert %d funds", inserted)
+
+	tx.Commit()
+	return nil
 }
 
-func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fund) (int, error) {
+func (m *FundsModel) SaveContributions(user *models.User, contributions []models.Fund) (int,error){
+	ctx := context.Background()
+	tx,err := m.DB.BeginTx(ctx,nil)
+
+	if err != nil {
+		m.Logger.ErrorLog.Fatalf("Error while starting transaction: %v",err)
+		return -1, err
+	}
+
+	defer func(){
+		if r := recover(); r != nil{
+			tx.Rollback()
+			m.Logger.ErrorLog.Fatalf("Error while saving contribution(s): %v",err)
+		}
+
+		tx.Rollback()
+	}()
+
+	response,err := m.insert(tx,ctx,user,contributions)
+	tx.Commit()
+
+	return response,err
+}
+
+func (m *FundsModel) insert(tx *sql.Tx,ctx context.Context,currentUser *models.User, contributions []models.Fund) (int, error) {
+
 	stmt := `INSERT INTO funds(break_down,total,organization_id,contribution_date,contributor,receipt_no,created_by) VALUES`
 
 	for i, contribution := range contributions {
@@ -104,7 +150,7 @@ func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fun
 		}
 
 		if contribution.ReceiptNo == "" {
-			contribution.ReceiptNo = "KCS-" + strconv.Itoa(int(time.Now().UnixMilli()))
+			contribution.ReceiptNo = "KCS-" + strconv.Itoa(int(time.Now().UnixMicro()))
 		}
 
 		s := fmt.Sprintf("('%s',%.2f,%d,'%s','%s','%s',%s)", string(breakDown), contribution.Total, contribution.OrganizationId, contribution.Date,
@@ -119,7 +165,7 @@ func (m *FundsModel) Insert(currentUser *models.User, contributions []models.Fun
 
 	stmt += ";"
 
-	result, err := m.DB.Exec(stmt)
+	result, err := tx.ExecContext(ctx,stmt)
 
 	if err != nil {
 		return 0, err
@@ -493,7 +539,7 @@ func (m *FundsModel) GetMonthlyVariance(targetCategories []string) ([]*models.Va
 	return statistics, nil
 }
 
-func (m *FundsModel) SaveCategories(categories []string) (int, error) {
+func (m *FundsModel) SaveCategories(tx *sql.Tx,ctx context.Context,categories []string) (int, error) {
 
 	distinctCategories := makeCategoriesUnique(&categories, m.GetCategories())
 
@@ -515,7 +561,7 @@ func (m *FundsModel) SaveCategories(categories []string) (int, error) {
 
 	stmt += ";"
 
-	result, err := m.DB.Exec(stmt)
+	result, err := tx.ExecContext(ctx,stmt)
 
 	if err != nil {
 		return 0, err

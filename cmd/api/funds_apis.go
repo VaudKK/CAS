@@ -48,7 +48,7 @@ func (app *application) addContribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = app.fundsModel.Insert(app.contextGetUser(r), contributions)
+	_, err = app.fundsModel.SaveContributions(app.contextGetUser(r), contributions)
 
 	if err != nil {
 		app.writeJSONError(w, http.StatusInternalServerError, err)
