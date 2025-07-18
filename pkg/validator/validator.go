@@ -11,7 +11,7 @@ import (
 // note further down the page.
 var (
 	EmailRX    = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
-	UserNameRX = regexp.MustCompile("[A-Za-z\\s]{1,50}")
+	UserNameRX = regexp.MustCompile(`[A-Za-z\\s]{1,50}`)
 )
 
 type Validator struct {

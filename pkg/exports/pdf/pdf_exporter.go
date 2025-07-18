@@ -79,7 +79,7 @@ func (pdfExport *PdfExport) GeneratePdfFile(data []*models.Fund, categories []st
 		pdf.Cell(nil, fmt.Sprintf("Consolidated summary from: %s to: %s", startDate.Format("2006-01-02"), endDate.Format("2006-01-02")))
 	} else if !startDate.IsZero() && endDate.IsZero() {
 		pdf.Cell(nil, fmt.Sprintf("Consolidated summary for: %s", startDate.Format("2006-01-02")))
-	}else{
+	} else {
 		pdf.Cell(nil, "Consolidated summary")
 	}
 
@@ -155,7 +155,7 @@ func (pdfExport *PdfExport) GeneratePdfFile(data []*models.Fund, categories []st
 		// Draw footer
 		pdf.SetX(40)
 		pdf.SetY(pageHeight - bottomMargin + 10)
-		pdf.Cell(nil, fmt.Sprintf("Page %d of %d %50v", page+1, pages/2, "Generated on " + time.Now().Format("2006-01-02 15:04:05")))
+		pdf.Cell(nil, fmt.Sprintf("Page %d of %d %50v", page+1, pages/2, "Generated on "+time.Now().Format("2006-01-02 15:04:05")))
 	}
 
 	// Write to buffer
@@ -166,14 +166,6 @@ func (pdfExport *PdfExport) GeneratePdfFile(data []*models.Fund, categories []st
 	}
 
 	return buf.Bytes(), nil
-}
-
-func sum(vals []float64) float64 {
-	var total float64
-	for _, v := range vals {
-		total += v
-	}
-	return total
 }
 
 func drawRow(pdf *gopdf.GoPdf, cells []string, x, y, colWidth, rowHeight float64, isHeader bool, isSingleCellRow bool) {

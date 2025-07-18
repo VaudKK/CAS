@@ -15,14 +15,14 @@ import (
 type ExcelImport struct {
 }
 
-func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportModel,[]string, error) {
+func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportModel, []string, error) {
 
-	uniqueCategories := make(map[string]bool,0)
+	uniqueCategories := make(map[string]bool, 0)
 
 	f, err := excelize.OpenReader(bytes.NewReader(data))
 
 	if err != nil {
-		return []imports.ImportModel{},nil, err
+		return []imports.ImportModel{}, nil, err
 	}
 
 	defer f.Close()
@@ -41,7 +41,7 @@ func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportMode
 		rows, err := f.GetRows(sheet)
 
 		if err != nil {
-			return []imports.ImportModel{},nil,err
+			return []imports.ImportModel{}, nil, err
 		}
 
 		// read the categories from the first row
@@ -54,7 +54,7 @@ func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportMode
 			categories = append(categories, rows[0][i])
 		}
 
-		exImport.getUniqueCategories(categories,uniqueCategories)
+		exImport.getUniqueCategories(categories, uniqueCategories)
 
 		for i := 1; i < len(rows); i++ {
 			if rows[i][0] == "" {
@@ -64,13 +64,13 @@ func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportMode
 			total, err := strconv.ParseFloat(exImport.cleanNumericField(rows[i][2]), 32)
 
 			if err != nil {
-				return []imports.ImportModel{},nil,err
+				return []imports.ImportModel{}, nil, err
 			}
 
 			breakdown, err := exImport.readBreakDown(categories, rows[i])
 
 			if err != nil {
-				return []imports.ImportModel{},nil,err
+				return []imports.ImportModel{}, nil, err
 			}
 
 			excelData = append(excelData, imports.ImportModel{
@@ -83,7 +83,7 @@ func (exImport *ExcelImport) ProcessExcelFile(data []byte) ([]imports.ImportMode
 
 	}
 
-	return excelData,exImport.convertMapToStringArray(uniqueCategories), nil
+	return excelData, exImport.convertMapToStringArray(uniqueCategories), nil
 }
 
 func (exImport *ExcelImport) cleanDate(date string) string {
@@ -120,15 +120,15 @@ func (exImport *ExcelImport) readBreakDown(categories []string, row []string) (m
 	return breakdown, nil
 }
 
-func(exImport *ExcelImport) escapeSingleQuote(s *string) string{
+func (exImport *ExcelImport) escapeSingleQuote(s *string) string {
 	if condition := strings.Contains(*s, "'"); condition {
 		*s = strings.ReplaceAll(*s, "'", "''")
-		return *s	
+		return *s
 	}
 	return *s
 }
 
-func (exImport *ExcelImport) getUniqueCategories(categories []string,uniqueCategories map[string]bool){
+func (exImport *ExcelImport) getUniqueCategories(categories []string, uniqueCategories map[string]bool) {
 	for _, category := range categories {
 		if _, ok := uniqueCategories[category]; !ok {
 			uniqueCategories[category] = true

@@ -19,7 +19,7 @@ type Token struct {
 
 type CustomClaims struct {
 	Identifier int
-	Exp int64
+	Exp        int64
 	jwt.RegisteredClaims
 }
 
@@ -48,23 +48,22 @@ func CreateToken(userID int) (Token, error) {
 	}, nil
 }
 
-func VerifyToken(tokenString string) (int,error) {
-	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{},func(t *jwt.Token) (interface{}, error) {
+func VerifyToken(tokenString string) (int, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return secretKey, nil
 	})
 
 	if err != nil {
 		logger.ErrorLog.Println(err)
-		return -1,err
+		return -1, err
 	}
 
-	if claim,ok := token.Claims.(*CustomClaims); ok && token.Valid {
-		return claim.Identifier,nil
-	}else{
+	if claim, ok := token.Claims.(*CustomClaims); ok && token.Valid {
+		return claim.Identifier, nil
+	} else {
 		return -1, fmt.Errorf("invalid token")
 	}
 }
-
 
 // Check if a User instance is the AnonymousUser.
 func IsAnonymous(u *models.User) bool {

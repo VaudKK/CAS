@@ -15,23 +15,23 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 	f := excelize.NewFile()
 
 	// Create a new sheet
-	index,err := f.NewSheet("Contributions")
+	index, err := f.NewSheet("Contributions")
 
 	if err != nil {
 		return nil, err
 	}
 
 	headerStyle, err := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Size: 10, Family: "Arial"},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"#D3D3D3"}, Pattern: 1},
-		Alignment: &excelize.Alignment{Horizontal: "center",Vertical: "center", WrapText: true},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "Arial"},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#D3D3D3"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border: []excelize.Border{
 			{Type: "left", Color: "#000000", Style: 1},
 			{Type: "top", Color: "#000000", Style: 1},
 			{Type: "right", Color: "#000000", Style: 1},
 			{Type: "bottom", Color: "#000000", Style: 1},
 		},
-	},)
+	})
 
 	if err != nil {
 		return nil, err
@@ -43,12 +43,11 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 			{Type: "top", Color: "#000000", Style: 1},
 			{Type: "right", Color: "#000000", Style: 1},
 			{Type: "bottom", Color: "#000000", Style: 1},
-		},})
+		}})
 
 	if err != nil {
 		return nil, err
 	}
-
 
 	f.SetColWidth("Contributions", "A", "AZ", 21)
 
@@ -61,7 +60,6 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 		headers = append(headers, category)
 		categoryIndex[category] = 4 + i
 	}
-
 
 	for i, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
@@ -89,18 +87,17 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 
 		// set border on all data cells
 		for k := 3; k < len(headers); k++ {
-			cellCategory, _ := excelize.CoordinatesToCellName(k + 1, i+2)
+			cellCategory, _ := excelize.CoordinatesToCellName(k+1, i+2)
 			f.SetCellStyle("Contributions", cellCategory, cellCategory, boarderStyle)
 		}
 
 		for category, amount := range contribution.BreakDown {
 			if j, ok := categoryIndex[category]; ok {
-				cellCategory, _ := excelize.CoordinatesToCellName(j + 1, i+2)
+				cellCategory, _ := excelize.CoordinatesToCellName(j+1, i+2)
 				f.SetCellValue("Contributions", cellCategory, amount)
 			}
 		}
 	}
-
 
 	// summation
 	row := len(data) + 1
@@ -113,7 +110,7 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 			{Type: "top", Color: "#000000", Style: 1},
 			{Type: "right", Color: "#000000", Style: 1},
 			{Type: "bottom", Color: "#000000", Style: 1},
-	},})
+		}})
 
 	if err != nil {
 		return nil, err
@@ -134,21 +131,19 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 
 	f.SetCellFormula("Contributions", cellTotal, fmt.Sprintf("SUM(%s:%s)", cellTotalStart, cellTotalEnd))
 
-
-	for i := 3; i < len(categoryIndex) + 3; i++ {
-		cellStart,_ := excelize.CoordinatesToCellName(i+2, 2)
-		cellEnd,_ := excelize.CoordinatesToCellName(i+2, row)
+	for i := 3; i < len(categoryIndex)+3; i++ {
+		cellStart, _ := excelize.CoordinatesToCellName(i+2, 2)
+		cellEnd, _ := excelize.CoordinatesToCellName(i+2, row)
 
 		cellCategory, _ := excelize.CoordinatesToCellName(i+2, row+2)
 		f.SetCellFormula("Contributions", cellCategory, fmt.Sprintf("SUM(%s:%s)", cellStart, cellEnd))
 		f.SetCellStyle("Contributions", cellCategory, cellCategory, totalStyle)
 	}
 
-
 	// Set the active sheet
 	f.SetActiveSheet(index)
 
-	buff,err := f.WriteToBuffer()
+	buff, err := f.WriteToBuffer()
 
 	if err != nil {
 		return nil, err
@@ -157,67 +152,65 @@ func (exExport *ExcelExport) GenerateExcelFile(data []*models.Fund, categories [
 	return buff.Bytes(), nil
 }
 
-
 func (exExport *ExcelExport) GenerateExcelSummary(data map[string][]models.MonthlySummations,
-	categories []string) ([]byte,error){
+	categories []string) ([]byte, error) {
 
 	f := excelize.NewFile()
 
-	index,err := f.NewSheet("ContributionsSummary")
+	index, err := f.NewSheet("ContributionsSummary")
 
 	if err != nil {
 		return nil, err
 	}
 
 	headerStyle, err := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Size: 10, Family: "Arial"},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"#D3D3D3"}, Pattern: 1},
-		Alignment: &excelize.Alignment{Horizontal: "center",Vertical: "center", WrapText: true},
+		Font:      &excelize.Font{Bold: true, Size: 10, Family: "Arial"},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#D3D3D3"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border: []excelize.Border{
 			{Type: "left", Color: "#000000", Style: 1},
 			{Type: "top", Color: "#000000", Style: 1},
 			{Type: "right", Color: "#000000", Style: 1},
 			{Type: "bottom", Color: "#000000", Style: 1},
 		},
-	},)
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
 	boarderStyle, err := f.NewStyle(&excelize.Style{
-	Border: []excelize.Border{
-		{Type: "left", Color: "#000000", Style: 1},
-		{Type: "top", Color: "#000000", Style: 1},
-		{Type: "right", Color: "#000000", Style: 1},
-		{Type: "bottom", Color: "#000000", Style: 1},
-	},})
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "right", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+		}})
 
 	if err != nil {
 		return nil, err
 	}
 
-
 	f.SetColWidth("ContributionsSummary", "A", "AZ", 17)
 
-	f.SetCellValue("ContributionsSummary","A1","CHURCH TREASURER'S CASH STATEMENT")
-	f.SetCellValue("ContributionsSummary","A2","KITENGELA CENTRAL SDA CHURCH")
-	f.SetCellValue("ContributionsSummary","A3","CONSOLIDATED REPORT")
+	f.SetCellValue("ContributionsSummary", "A1", "CHURCH TREASURER'S CASH STATEMENT")
+	f.SetCellValue("ContributionsSummary", "A2", "KITENGELA CENTRAL SDA CHURCH")
+	f.SetCellValue("ContributionsSummary", "A3", "CONSOLIDATED REPORT")
 
 	f.SetCellStyle("ContributionsSummary", "A1", "J1", headerStyle)
 	f.SetCellStyle("ContributionsSummary", "A2", "J2", headerStyle)
 	f.SetCellStyle("ContributionsSummary", "A3", "J3", headerStyle)
 
 	if err := f.MergeCell("ContributionsSummary", "A1", "J1"); err != nil {
-		return nil,err
+		return nil, err
 	}
 
-		if err := f.MergeCell("ContributionsSummary", "A2", "J2"); err != nil {
-		return nil,err
+	if err := f.MergeCell("ContributionsSummary", "A2", "J2"); err != nil {
+		return nil, err
 	}
 
-		if err := f.MergeCell("ContributionsSummary", "A3", "J3"); err != nil {
-		return nil,err
+	if err := f.MergeCell("ContributionsSummary", "A3", "J3"); err != nil {
+		return nil, err
 	}
 
 	categoryIndex := make(map[string]int)
@@ -238,24 +231,24 @@ func (exExport *ExcelExport) GenerateExcelSummary(data map[string][]models.Month
 
 	// Set the data
 	i := 1
-	for key,value := range data {
-		cellCategory, _ := excelize.CoordinatesToCellName(1, i + 4)
-		f.SetCellValue("ContributionsSummary", cellCategory, strings.Split(key,"T")[0])
+	for key, value := range data {
+		cellCategory, _ := excelize.CoordinatesToCellName(1, i+4)
+		f.SetCellValue("ContributionsSummary", cellCategory, strings.Split(key, "T")[0])
 
 		for _, row := range value {
-			if j,ok := categoryIndex[row.Category]; ok {
-				j+=1
-				cellCategory, _ := excelize.CoordinatesToCellName(j+1,i + 4)
+			if j, ok := categoryIndex[row.Category]; ok {
+				j += 1
+				cellCategory, _ := excelize.CoordinatesToCellName(j+1, i+4)
 				f.SetCellValue("ContributionsSummary", cellCategory, row.Total)
 			}
 		}
 
 		// set border on all data cells
 		for k := 0; k < len(headers); k++ {
-			cellCategory, _ := excelize.CoordinatesToCellName(k + 1, i+4)
+			cellCategory, _ := excelize.CoordinatesToCellName(k+1, i+4)
 			f.SetCellStyle("ContributionsSummary", cellCategory, cellCategory, boarderStyle)
 		}
-		i+=1
+		i += 1
 	}
 
 	// summation
@@ -269,30 +262,28 @@ func (exExport *ExcelExport) GenerateExcelSummary(data map[string][]models.Month
 			{Type: "top", Color: "#000000", Style: 1},
 			{Type: "right", Color: "#000000", Style: 1},
 			{Type: "bottom", Color: "#000000", Style: 1},
-	},})
+		}})
 
 	if err != nil {
 		return nil, err
 	}
 
-	text,_ := excelize.CoordinatesToCellName(1,totalsRow)
+	text, _ := excelize.CoordinatesToCellName(1, totalsRow)
 	f.SetCellStyle("ContributionsSummary", text, text, totalStyle)
 	f.SetCellValue("ContributionsSummary", text, "Total")
 
-
-	for i := 1; i < len(categoryIndex) + 1; i++ {
-		cellStart,_ := excelize.CoordinatesToCellName(i+1, 5)
-		cellEnd,_ := excelize.CoordinatesToCellName(i+1, totalsRow - 2)
+	for i := 1; i < len(categoryIndex)+1; i++ {
+		cellStart, _ := excelize.CoordinatesToCellName(i+1, 5)
+		cellEnd, _ := excelize.CoordinatesToCellName(i+1, totalsRow-2)
 
 		cellCategory, _ := excelize.CoordinatesToCellName(i+1, totalsRow)
 		f.SetCellFormula("ContributionsSummary", cellCategory, fmt.Sprintf("SUM(%s:%s)", cellStart, cellEnd))
 		f.SetCellStyle("ContributionsSummary", cellCategory, cellCategory, totalStyle)
 	}
 
-
 	f.SetActiveSheet(index)
 
-	buff,err := f.WriteToBuffer()
+	buff, err := f.WriteToBuffer()
 
 	if err != nil {
 		return nil, err

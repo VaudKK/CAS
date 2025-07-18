@@ -9,6 +9,7 @@ import (
 
 	"github.com/VaudKK/CAS/pkg/mailer"
 	"github.com/VaudKK/CAS/pkg/models"
+	"github.com/VaudKK/CAS/utils"
 	"github.com/google/uuid"
 )
 
@@ -16,6 +17,7 @@ type OtpModel struct {
 	DB     *sql.DB
 	Mailer *mailer.Mailer
 	User   *UserModel
+	Logger *utils.CLogger
 }
 
 func (m *OtpModel) SendOtp(subject, mode string) (*models.Otp, error) {
@@ -99,11 +101,12 @@ func (m *OtpModel) VerifyOtp(otp, sessionId string) (bool, error) {
 		return false, err
 	}
 
-	// err = m.User.VerifyUser(data.subject)
+	//send account review email
+	err = m.Mailer.Send(data.subject, "account_review.tmpl", nil)
 
-	// if err != nil {
-	// 	return false, err
-	// }
+	if err != nil {
+		m.Logger.ErrorLog.Printf("Error while sending review email: %v", err)
+	}
 
 	return true, nil
 }

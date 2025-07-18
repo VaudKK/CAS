@@ -53,16 +53,16 @@ func (m *FundsModel) ValidateFile(file multipart.File, fileName string) ([]byte,
 func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte, fileName string) error {
 	ctx := context.Background()
 
-	tx,err := m.DB.BeginTx(ctx,nil)
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
-		m.Logger.ErrorLog.Printf("Error while starting db transaction: %s",err.Error())
+		m.Logger.ErrorLog.Printf("Error while starting db transaction: %s", err.Error())
 		return err
 	}
 
-	defer func(){
-		if r := recover(); r != nil{
+	defer func() {
+		if r := recover(); r != nil {
 			tx.Rollback()
-			m.Logger.ErrorLog.Fatalf("Error while processing excel data: %v",err)
+			m.Logger.ErrorLog.Fatalf("Error while processing excel data: %v", err)
 		}
 
 		tx.Rollback()
@@ -91,7 +91,7 @@ func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte,
 		funds = append(funds, fund)
 	}
 
-	insertedCategories, err := m.SaveCategories(tx,ctx,categories)
+	insertedCategories, err := m.SaveCategories(tx, ctx, categories)
 
 	if err != nil {
 		m.Logger.ErrorLog.Printf("Error while saving categories: %v", err)
@@ -100,7 +100,7 @@ func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte,
 
 	utils.GetLoggerInstance().InfoLog.Printf("Will insert %d categories", insertedCategories)
 
-	inserted, err := m.insert(tx,ctx,currentUser, funds)
+	inserted, err := m.insert(tx, ctx, currentUser, funds)
 
 	if err != nil {
 		m.Logger.ErrorLog.Printf("Error while saving contributions: %v", err)
@@ -113,31 +113,31 @@ func (m *FundsModel) ProcessExcelFile(currentUser *models.User, fileData []byte,
 	return nil
 }
 
-func (m *FundsModel) SaveContributions(user *models.User, contributions []models.Fund) (int,error){
+func (m *FundsModel) SaveContributions(user *models.User, contributions []models.Fund) (int, error) {
 	ctx := context.Background()
-	tx,err := m.DB.BeginTx(ctx,nil)
+	tx, err := m.DB.BeginTx(ctx, nil)
 
 	if err != nil {
-		m.Logger.ErrorLog.Fatalf("Error while starting transaction: %v",err)
+		m.Logger.ErrorLog.Fatalf("Error while starting transaction: %v", err)
 		return -1, err
 	}
 
-	defer func(){
-		if r := recover(); r != nil{
+	defer func() {
+		if r := recover(); r != nil {
 			tx.Rollback()
-			m.Logger.ErrorLog.Fatalf("Error while saving contribution(s): %v",err)
+			m.Logger.ErrorLog.Fatalf("Error while saving contribution(s): %v", err)
 		}
 
 		tx.Rollback()
 	}()
 
-	response,err := m.insert(tx,ctx,user,contributions)
+	response, err := m.insert(tx, ctx, user, contributions)
 	tx.Commit()
 
-	return response,err
+	return response, err
 }
 
-func (m *FundsModel) insert(tx *sql.Tx,ctx context.Context,currentUser *models.User, contributions []models.Fund) (int, error) {
+func (m *FundsModel) insert(tx *sql.Tx, ctx context.Context, currentUser *models.User, contributions []models.Fund) (int, error) {
 
 	stmt := `INSERT INTO funds(break_down,total,organization_id,contribution_date,contributor,receipt_no,created_by) VALUES`
 
@@ -165,7 +165,7 @@ func (m *FundsModel) insert(tx *sql.Tx,ctx context.Context,currentUser *models.U
 
 	stmt += ";"
 
-	result, err := tx.ExecContext(ctx,stmt)
+	result, err := tx.ExecContext(ctx, stmt)
 
 	if err != nil {
 		return 0, err
@@ -272,10 +272,10 @@ func (m *FundsModel) FullTextSearch(searchString string, exact bool, startDate, 
 				} else {
 					searchTerms += token + ":* | "
 				}
+			}
 		}
-	}
 
-	query = fmt.Sprintf(query, searchTerms)
+		query = fmt.Sprintf(query, searchTerms)
 	}
 
 	var rows *sql.Rows
@@ -539,7 +539,7 @@ func (m *FundsModel) GetMonthlyVariance(targetCategories []string) ([]*models.Va
 	return statistics, nil
 }
 
-func (m *FundsModel) SaveCategories(tx *sql.Tx,ctx context.Context,categories []string) (int, error) {
+func (m *FundsModel) SaveCategories(tx *sql.Tx, ctx context.Context, categories []string) (int, error) {
 
 	distinctCategories := makeCategoriesUnique(&categories, m.GetCategories())
 
@@ -561,7 +561,7 @@ func (m *FundsModel) SaveCategories(tx *sql.Tx,ctx context.Context,categories []
 
 	stmt += ";"
 
-	result, err := tx.ExecContext(ctx,stmt)
+	result, err := tx.ExecContext(ctx, stmt)
 
 	if err != nil {
 		return 0, err

@@ -134,18 +134,18 @@ func (app *application) readIntParam(values url.Values, key string, defaultValue
 	return i
 }
 
-func (app *application) readDateParam(values url.Values,key string) (time.Time,bool) {
+func (app *application) readDateParam(values url.Values, key string) (time.Time, bool) {
 	s := values.Get(key)
-	
+
 	if s == "" {
-		return time.Time{},false
+		return time.Time{}, false
 	}
 
-	t,err := time.Parse("2006-01-02",s)
+	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
-		utils.GetLoggerInstance().ErrorLog.Printf("Error converting %s to date",s)
-		return time.Now(),false
+		utils.GetLoggerInstance().ErrorLog.Printf("Error converting %s to date", s)
+		return time.Now(), false
 	}
 
-	return t,true
+	return t, true
 }
