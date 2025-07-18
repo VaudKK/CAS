@@ -1,0 +1,52 @@
+{{define "subject"}}Welcome to KCSDA!{{end}}
+{{define "plainBody"}}
+Hi,
+Thanks for signing up for a KCSDA account. We're excited to have you on board!
+Thanks,
+The KCSDA Team
+{{end}}
+{{define "htmlBody"}}
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Welcome to KCSDA</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f7fa; color: #333333;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f5f7fa; padding: 20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header with Logo -->
+          <tr>
+            <td style="background-color: #003366; padding: 20px; text-align: center;">
+              <img src="cid:logo.png" alt="SDA Logo" width="120" style="max-width: 100%; height: auto;" />
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 30px;">
+              <h2 style="margin-top: 0; color: #003366;">Hi,</h2>
+              <p style="font-size: 16px; line-height: 1.6;">
+                Thanks for signing up for a <strong>KCSDA</strong> account. We're excited to have you on board!
+              </p>
+              <p style="font-size: 16px; line-height: 1.6;">Thanks,<br /><strong>The KCSDA Team</strong></p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #777;">
+              &copy; 2025 KCSDA. All rights reserved.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+{{end}}
